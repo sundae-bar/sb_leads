@@ -1,9 +1,0 @@
-{
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(dashboard)/page": "app/(dashboard)/page.js",
-  "/(dashboard)/settings/page": "app/(dashboard)/settings/page.js",
-  "/api/billing/subscription/route": "app/api/billing/subscription/route.js",
-  "/api/contacts/route": "app/api/contacts/route.js",
-  "/api/find-email/route": "app/api/find-email/route.js",
-  "/api/user/profile/route": "app/api/user/profile/route.js"
-}

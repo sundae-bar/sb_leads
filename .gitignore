@@ -1,5 +1,6 @@
 node_modules
 dist
+build
 logs
 .env
 .env.local
@@ -7,3 +8,11 @@ logs
 .DS_Store
 .idea
 .vscode
+
+# Next.js
+.next
+out
+
+# Turbopack / build caches
+apps/web/.next
+apps/api/dist
