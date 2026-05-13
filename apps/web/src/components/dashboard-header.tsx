@@ -15,10 +15,10 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle"
 
 const routeLabels: Record<string, string> = {
-  "/": "Email finder",
-  "/chat": "Chat",
-  "/traces": "Traces",
-  "/settings": "Settings",
+  "/app": "Email finder",
+  "/app/chat": "Chat",
+  "/app/traces": "Traces",
+  "/app/settings": "Settings",
 }
 
 function getBreadcrumbs(pathname: string): { label: string; href?: string }[] {

@@ -221,7 +221,7 @@ export function AppSidebar() {
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
-                    <Link href="/settings">
+                    <Link href="/app/settings">
                       <User className="mr-2 size-4" />
                       Profile
                     </Link>

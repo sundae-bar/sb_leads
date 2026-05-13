@@ -70,7 +70,7 @@ export default function SignupPage() {
           body: JSON.stringify({ tenantName: workspaceName || name }),
         })
         if (tenantRes.ok) {
-          router.push('/')
+          router.push('/app')
           router.refresh()
         } else {
           router.push('/onboarding')

@@ -4,12 +4,26 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password', '/verify-email'];
 
+// Public pages — no auth required, no redirects. The marketing landing at /
+// is the only one for now; add more here as the marketing site grows
+// (`/pricing`, `/docs`, etc.).
+const PUBLIC_ROUTES = ['/'];
+
 function isAuthRoute(pathname: string) {
   return AUTH_ROUTES.some((r) => pathname.startsWith(r));
 }
 
+function isPublicRoute(pathname: string) {
+  return PUBLIC_ROUTES.includes(pathname);
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Marketing pages render for everyone — skip the auth gate entirely.
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next({ request });
+  }
 
   let supabaseResponse = NextResponse.next({ request });
 
@@ -47,10 +61,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated users on an auth page → home.
+  // Authenticated users on an auth page → app.
   if (user && isAuthRoute(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = '/';
+    url.pathname = '/app';
     return NextResponse.redirect(url);
   }
 
