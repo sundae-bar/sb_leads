@@ -18,9 +18,6 @@
     "paths": {
       "@/*": [
         "src/*"
-      ],
-      "@sundae/types": [
-        "../../packages/types/src/index.ts"
       ]
     },
     "allowJs": true,

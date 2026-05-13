@@ -1,7 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { FindEmailResult, ProviderName, EmailType } from '@sundae/types';
+import {
+  type FindEmailResult,
+  type ProviderName,
+  type EmailType,
+  mergeFindEmailResult,
+} from '@sundae/types';
 
 export interface FindEmailParams {
   linkedin_url: string;
@@ -9,6 +14,11 @@ export interface FindEmailParams {
   waterfall: boolean;
   email_types: EmailType[];
   verify: boolean;
+}
+
+export interface TopUpParams {
+  linkedin_url: string;
+  provider: ProviderName;
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -22,6 +32,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return res.json();
 }
+
 
 export function useLeads() {
   const queryClient = useQueryClient();
@@ -57,5 +68,39 @@ export function useLeads() {
     },
   });
 
-  return { contacts, contactsLoading, search };
+  /**
+   * Single-provider top-up for an existing lead. Merges (rather than replaces)
+   * the existing row in the cache so other providers' emails stick around.
+   */
+  const topUp = useMutation({
+    mutationFn: async ({ linkedin_url, provider }: TopUpParams) => {
+      const result = await apiFetch<FindEmailResult>('/api/find-email', {
+        method: 'POST',
+        body: JSON.stringify({
+          linkedin_url,
+          providers: [provider],
+          waterfall: false,
+          email_types: ['work', 'personal'],
+          verify: false,
+        } satisfies FindEmailParams),
+      });
+      await apiFetch('/api/contacts', {
+        method: 'POST',
+        body: JSON.stringify(result),
+      });
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData(['contacts'], (old: FindEmailResult[] = []) => {
+        const idx = old.findIndex((c) => c.linkedin_url === result.linkedin_url);
+        if (idx < 0) return [result, ...old];
+        const next = [...old];
+        next[idx] = mergeFindEmailResult(old[idx], result);
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: ['billing', 'subscription'] });
+    },
+  });
+
+  return { contacts, contactsLoading, search, topUp };
 }

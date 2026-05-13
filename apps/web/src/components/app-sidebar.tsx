@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import {
   LayoutDashboard,
+  MessageSquare,
   Settings,
   LogOut,
   ChevronsUpDown,
@@ -43,12 +44,17 @@ import { toast } from "sonner"
 const navItems = [
   {
     title: "Dashboard",
-    href: "/",
+    href: "/app",
     icon: LayoutDashboard,
   },
   {
+    title: "Chat",
+    href: "/app/chat",
+    icon: MessageSquare,
+  },
+  {
     title: "Settings",
-    href: "/settings",
+    href: "/app/settings",
     icon: Settings,
   },
 ]
@@ -108,7 +114,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/">
+              <Link href="/app">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <Sparkles className="size-4" />
                 </div>

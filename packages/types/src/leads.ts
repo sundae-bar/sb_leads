@@ -51,6 +51,8 @@ export interface FindEmailResult {
   company?: Company;
   providers_attempted: ProviderAttempt[];
   credits_used: number;
+  /** Tenant's remaining credits after this call (refunded if no emails found). */
+  credits_remaining?: number;
 }
 
 export interface VerifyEmailResult {

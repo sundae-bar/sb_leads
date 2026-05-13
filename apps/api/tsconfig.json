@@ -5,10 +5,7 @@
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
-    "baseUrl": ".",
-    "paths": {
-      "@sundae/types": ["../../packages/types/src/index.ts"]
-    }
+    "baseUrl": "."
   },
   "include": ["src"]
 }

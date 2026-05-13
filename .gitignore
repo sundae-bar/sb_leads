@@ -16,3 +16,13 @@ out
 # Turbopack / build caches
 apps/web/.next
 apps/api/dist
+*.tsbuildinfo
+
+# Local Claude Code worktrees / scratch
+.claude/worktrees
+.claude/settings.local.json
+
+# Supabase CLI scratch
+supabase/.temp
+supabase/.branches
+supabase/snippets

@@ -71,4 +71,6 @@ export interface ApiKey {
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** True for keys auto-minted by the platform (e.g. the chat agent's own MCP key). */
+  isManaged: boolean;
 }

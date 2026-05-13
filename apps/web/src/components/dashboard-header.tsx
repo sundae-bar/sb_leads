@@ -15,7 +15,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle"
 
 const routeLabels: Record<string, string> = {
-  "/": "Dashboard",
+  "/": "Email finder",
   "/chat": "Chat",
   "/traces": "Traces",
   "/settings": "Settings",

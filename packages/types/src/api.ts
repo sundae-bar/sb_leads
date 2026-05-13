@@ -114,6 +114,8 @@ export interface ApiKeyResponse {
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** True for keys auto-minted by the platform (e.g. chat agent's MCP key). */
+  isManaged?: boolean;
 }
 
 export interface CreateApiKeyRequest {

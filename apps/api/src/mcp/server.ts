@@ -2,22 +2,30 @@ import type { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { logger } from "../logger.js";
-import { registerTools } from "./tools.js";
+import { registerTools, type McpAuthContext } from "./tools.js";
 
-const buildServer = (): McpServer => {
+const buildServer = (auth: McpAuthContext): McpServer => {
   const server = new McpServer(
     { name: "sundae-leads", version: "0.1.0" },
     { capabilities: { tools: {} } },
   );
-  registerTools(server);
+  registerTools(server, auth);
   return server;
 };
 
-// Stateless: a fresh server + transport per request. Simpler for v1; we can
-// switch to a session-based model later if we need streaming/notifications
-// across requests.
+// Stateless: a fresh server + transport per request. The auth context comes
+// from requireLeadsAuth (req.user) and is captured in the tool closures so
+// every invocation is tenant-scoped and credit-billed.
 export const handleMcpRequest = async (req: Request, res: Response): Promise<void> => {
-  const server = buildServer();
+  if (!req.user) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  const server = buildServer({
+    tenantId: req.user.tenantId,
+    userId: req.user.id,
+  });
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });

@@ -9,9 +9,7 @@ import {
   updateConversation,
 } from '../db/queries/conversations.js';
 import { listMessages, createMessage } from '../db/queries/messages.js';
-import { consumeCredits } from '../lib/billing.js';
-import { meterAgentRun } from '@sundae/types';
-import type { CoreMessage } from 'ai';
+import type { ModelMessage } from 'ai';
 
 function generateTitleFromMessage(message: string): string {
   const cleaned = message.trim().replace(/\s+/g, ' ');
@@ -46,19 +44,10 @@ chatRouter.post(
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders();
 
-      // Gate on credits before doing any work. The pluggable meter (default 1
-      // per call) lives in @sundae/types — change it there to switch
-      // to token- or cost-based metering, and move this call to post-run.
-      const cost = meterAgentRun({});
-      const guard = await consumeCredits(tenantId, cost);
-      if (!guard.ok) {
-        res.write(
-          `data: ${JSON.stringify({ error: 'out_of_credits', reason: guard.reason })}\n\n`,
-        );
-        res.write(`data: [DONE]\n\n`);
-        res.end();
-        return;
-      }
+      // No upfront credit charge for chat — the agent's tools (e.g. find_email)
+      // bill per-call through MCP, dogfooding the same path external integrators
+      // use. If the user has zero credits, the tool itself returns
+      // "out_of_credits" and the model handles it.
 
       let conversationId = providedConversationId;
       let isNewConversation = false;
@@ -83,7 +72,7 @@ chatRouter.post(
       await createMessage(supabase, { conversationId: conversationId!, role: 'user', content: message });
 
       const history = await listMessages(supabase, conversationId!);
-      const coreMessages: CoreMessage[] = history.map((m) => ({
+      const coreMessages: ModelMessage[] = history.map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       }));

@@ -209,6 +209,15 @@ export function SettingsApiKeys() {
                     <span className="truncate text-sm font-medium text-foreground">
                       {apiKey.name}
                     </span>
+                    {apiKey.isManaged && (
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0 text-xs"
+                        title="Auto-managed by the platform (used by the chat agent to call its own MCP server)"
+                      >
+                        Managed
+                      </Badge>
+                    )}
                     <Badge variant={expiryStatus.variant} className="shrink-0 text-xs">
                       {expiryStatus.label}
                     </Badge>
@@ -233,10 +242,11 @@ export function SettingsApiKeys() {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
-                      onClick={() => handleDeleteClick(apiKey.id)}
+                      disabled={apiKey.isManaged}
+                      onClick={() => !apiKey.isManaged && handleDeleteClick(apiKey.id)}
                     >
                       <Trash2 className="mr-2 size-4" />
-                      Delete
+                      {apiKey.isManaged ? 'Delete (managed)' : 'Delete'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

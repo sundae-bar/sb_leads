@@ -64,13 +64,15 @@ export function makeTraceLogger(supabase: SupabaseClient): TraceLogger {
       const stepStartTime = runStartTime;
       const durationMs = completedAt.getTime() - stepStartTime;
 
+      // ai-sdk v5 removed `stepType`. Infer from whether tools were called.
+      const hasToolCalls = (step.toolCalls?.length ?? 0) > 0;
+      const stepKind = hasToolCalls ? 'tool_call' : 'llm_call';
+
       const { error } = await supabase.from('agent_run_steps').insert({
         run_id: runId,
-        step_type: step.stepType === 'initial' ? 'llm_call' : step.stepType,
-        step_name: step.stepType,
-        input: {
-          messages: step.request?.body ? JSON.parse(step.request.body as string) : null,
-        },
+        step_type: stepKind,
+        step_name: stepKind,
+        input: null,
         output: {
           text: step.text,
           toolCalls: step.toolCalls,

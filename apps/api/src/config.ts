@@ -1,7 +1,9 @@
 import 'dotenv/config';
 
 export const config = {
-  port: Number(process.env.API_PORT ?? 4000),
+  // Prefer PORT (Railway / most PaaS auto-injects it); fall back to API_PORT
+  // for local dev, then 4000.
+  port: Number(process.env.PORT ?? process.env.API_PORT ?? 4000),
   nodeEnv: process.env.NODE_ENV ?? 'development',
   logLevel: process.env.LOG_LEVEL ?? 'info',
   providers: {

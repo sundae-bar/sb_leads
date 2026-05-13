@@ -18,6 +18,7 @@ apiKeysRouter.get('/', requireAuth, async (req, res, next) => {
       lastUsedAt: key.lastUsedAt,
       createdAt: key.createdAt,
       updatedAt: key.updatedAt,
+      isManaged: key.isManaged,
     }));
     res.json(response);
   } catch (err) {

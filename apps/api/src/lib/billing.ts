@@ -68,3 +68,34 @@ export async function consumeCredits(
     return { ok: false, reason: 'rebill_failed' };
   }
 }
+
+/**
+ * Refund credits to a tenant — used when a previously-consumed credit didn't
+ * yield a result (e.g. find-email returned no emails). Returns the new balance.
+ */
+export async function refundCredits(
+  tenantId: string,
+  amount: number,
+): Promise<{ remaining: number }> {
+  const { data: current } = await adminDb
+    .from('subscriptions')
+    .select('credits_remaining')
+    .eq('tenant_id', tenantId)
+    .single();
+  const next = ((current?.credits_remaining as number | undefined) ?? 0) + amount;
+  await adminDb
+    .from('subscriptions')
+    .update({ credits_remaining: next })
+    .eq('tenant_id', tenantId);
+  return { remaining: next };
+}
+
+/** Read current credits without consuming. */
+export async function getCreditsRemaining(tenantId: string): Promise<number> {
+  const { data } = await adminDb
+    .from('subscriptions')
+    .select('credits_remaining')
+    .eq('tenant_id', tenantId)
+    .single();
+  return (data?.credits_remaining as number | undefined) ?? 0;
+}

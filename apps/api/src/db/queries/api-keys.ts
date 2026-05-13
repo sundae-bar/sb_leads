@@ -121,5 +121,6 @@ function toApiKey(row: Record<string, unknown>): ApiKey {
     lastUsedAt: (row.last_used_at as string | null) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    isManaged: (row.is_managed as boolean | null) ?? false,
   };
 }
