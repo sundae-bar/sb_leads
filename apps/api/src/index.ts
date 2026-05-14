@@ -8,6 +8,8 @@ import { errorHandler } from './middleware/error.js';
 import { requireLeadsAuth } from './middleware/requireLeadsAuth.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { handleThe402Webhook } from './integrations/the402/webhook.js';
+import { x402Middleware } from './integrations/x402/server.js';
+import { x402FindEmailRouter } from './routes/x402-find-email.js';
 // Tenant routes (Supabase JWT auth)
 import { chatRouter } from './routes/chat.js';
 import { conversationsRouter } from './routes/conversations.js';
@@ -59,6 +61,7 @@ app.use('/find-email', enrichmentLimit);
 app.use('/verify-email', enrichmentLimit);
 app.use('/intent-signals', enrichmentLimit);
 app.use('/mcp', enrichmentLimit);
+app.use('/x402', enrichmentLimit);
 
 // Leads enrichment routes (JWT or API key — auth inside each router)
 app.use(findEmailRouter);
@@ -74,6 +77,13 @@ app.delete('/mcp', requireLeadsAuth, handleMcpRequest);
 
 // the402.ai webhook — HMAC-verified inside the handler, not behind requireLeadsAuth.
 app.post('/the402/webhook', handleThe402Webhook);
+
+// x402 direct payment endpoint — the middleware runs the 402-retry dance
+// (Payment-Required header on first hit; payment-proof verification via the
+// configured facilitator on retry). Only payment-verified requests reach the
+// router below. The deliverable price is set via env vars on the middleware.
+app.use(x402Middleware);
+app.use(x402FindEmailRouter);
 
 app.use(errorHandler);
 

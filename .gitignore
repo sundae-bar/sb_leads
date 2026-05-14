@@ -8,6 +8,7 @@ logs
 .DS_Store
 .idea
 .vscode
+cdp_wallet_secret.txt
 
 # Next.js
 .next
