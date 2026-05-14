@@ -1,14 +1,17 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MarketingSection } from '@/components/marketing/section';
+import { LogoCloud } from '@/components/marketing/logo-cloud';
 import type { Metadata } from 'next';
+import hero from './scoop-hero.module.css';
 
 export const metadata: Metadata = {
-  title: 'Sundae Leads — Verified emails for any LinkedIn URL',
+  title: 'scoop · Email lead-gen for AI agents',
   description:
-    'An agent in the sundae_bar portfolio. Paste a LinkedIn URL, get verified emails. Refunds on misses. Available via dashboard, chat, or MCP.',
+    'Verified emails for any LinkedIn profile, billed per result. Refunded automatically when nothing is found. An agent skill in the sundae_bar portfolio.',
 };
 
 const PROVIDER_CHAIN = ['Aleads', 'Apollo', 'Nymeria', 'ContactOut'] as const;
@@ -31,43 +34,79 @@ const CHAT_SNIPPET = `> Find a business email for https://linkedin.com/in/<handl
 export default function MarketingPage() {
   return (
     <div className="w-full">
-      {/* Hero */}
-      <section className="mx-auto w-full max-w-6xl px-6 pt-20 pb-16 sm:pt-28 sm:pb-20">
-        <div className="flex flex-col gap-6">
-          <span className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
-            An agent in the sundae_bar portfolio
-          </span>
-          <h1 className="max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
-            Verified emails for any LinkedIn profile,{' '}
-            <span className="text-muted-foreground">paid by the agent.</span>
-          </h1>
-          <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-            Paste a LinkedIn URL, get back a deliverability-graded email across four
-            providers. We refund the credit automatically when nothing is found —
-            you only pay for hits.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button asChild size="lg">
-              <Link href="/signup">Get started</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/app">Open the app →</Link>
-            </Button>
+      {/* Hero — scoop launch asset. Dark, saturated blob backdrop, vignette,
+          film grain. Centre stack: eyebrow, big scoop wordmark, tagline.
+          Top-left "· NEW" tag, bottom-right "TRAINED BY SN121" watermark. */}
+      <section className={hero.card}>
+        <Image
+          src="/brand/scoop-blob-D.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className={hero.bg}
+        />
+        <div className={hero.grain} />
+
+        <div className={hero.tagRow}>
+          <span className={hero.tag}>New</span>
+        </div>
+
+        <div className={hero.stack}>
+          <div className={hero.eyebrow}>
+            <span className={hero.bar} />
+            <span>sundae_bar</span>
+            <span className={hero.bar} />
           </div>
+
+          <h1 className={hero.wordmark}>
+            scoop<sup className={hero.sbMark}>s_</sup>
+          </h1>
+
+          <p className={hero.tagline}>
+            Agent Skill:&nbsp; <em>Email Lead Generation</em>
+          </p>
+        </div>
+
+        <div className={hero.ctaRow}>
+          <Button asChild size="lg" className="h-11 px-6">
+            <Link href="/signup">Get started</Link>
+          </Button>
+          <Button
+            asChild
+            size="lg"
+            variant="outline"
+            className="h-11 border-white/30 bg-white/10 px-6 text-white backdrop-blur hover:bg-white/20 hover:text-white"
+          >
+            <Link href="/app">Open in app →</Link>
+          </Button>
+        </div>
+
+        <div className={hero.watermark}>
+          <span className={hero.trainedBy}>Trained by SN121</span>
         </div>
       </section>
 
-      {/* 002 — How it works */}
+      {/* Provider logo cloud — sits between the hero and the first
+          numbered section. Anchors credibility without taking a full slot. */}
+      <section className="border-y border-border/40 bg-background">
+        <div className="mx-auto w-full max-w-6xl px-6">
+          <LogoCloud />
+        </div>
+      </section>
+
+      {/* 002 — How it works · soft off-white (gray-100) */}
       <MarketingSection
         number="002"
         title="Paste a URL. Get an email."
         description="No CSV uploads, no manual provider switching. The waterfall picks the cheapest hit first; falls through automatically when one provider misses."
+        className="bg-muted"
       >
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="flex flex-col gap-3">
             <span className="font-mono text-xs text-muted-foreground">step 1</span>
             <p className="text-base font-medium">Paste a LinkedIn profile URL.</p>
-            <pre className="overflow-x-auto rounded-md border bg-muted/40 p-3 font-mono text-xs">
+            <pre className="overflow-x-auto rounded-md border bg-background p-3 font-mono text-xs">
               https://linkedin.com/in/<span className="text-muted-foreground">&lt;handle&gt;</span>
             </pre>
           </div>
@@ -100,11 +139,12 @@ export default function MarketingPage() {
         </div>
       </MarketingSection>
 
-      {/* 003 — Three ways to call it */}
+      {/* 003 — Three surfaces · pure white for clean breath */}
       <MarketingSection
         number="003"
         title="Three surfaces. One workspace."
         description="Whether you're a human, a chat agent, or an autonomous worker on the402.ai marketplace, you talk to the same backend."
+        className="bg-background"
       >
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <Card>
@@ -154,11 +194,12 @@ export default function MarketingPage() {
         </div>
       </MarketingSection>
 
-      {/* 004 — Why it's different */}
+      {/* 004 — Why it's different · brand-blue flavour tint */}
       <MarketingSection
         number="004"
         title="Built for agents, not for spreadsheets."
         description="Most enrichment tools charge for misses, lock you into one provider, and don't speak agent-native. We do the opposite on all three."
+        className="[background:var(--flavor-blue-bg)]"
       >
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="flex flex-col gap-2 rounded-md border p-5">
@@ -192,11 +233,12 @@ export default function MarketingPage() {
         </div>
       </MarketingSection>
 
-      {/* 005 — Pricing */}
+      {/* 005 — Pricing · back to soft off-white so the tier cards punch */}
       <MarketingSection
         number="005"
         title="Pricing that bills the way agents work."
         description="Per credit, per cycle. Credits auto-rebill when you run dry; never wait until next month for a deal to clear."
+        className="bg-muted"
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Card>
@@ -259,18 +301,51 @@ export default function MarketingPage() {
         </div>
       </MarketingSection>
 
-      {/* CTA */}
-      <section className="mx-auto w-full max-w-6xl px-6 py-24">
-        <div className="flex flex-col items-start gap-4 rounded-lg border bg-muted/20 p-10">
-          <span className="font-mono text-xs text-muted-foreground">006/</span>
-          <h2 className="max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-            Ten free credits. No card. Start finding emails in 60 seconds.
+      {/* CTA — full-bleed dark section with saturated blob, mirrors the hero
+          treatment so the page ends with brand energy instead of a boxed card. */}
+      <section className="relative isolate overflow-hidden bg-[#1A1B26] py-28 text-white sm:py-32">
+        <Image
+          src="/brand/scoop-blob-G.jpg"
+          alt=""
+          fill
+          sizes="100vw"
+          className="absolute inset-0 z-0 object-cover object-center"
+        />
+        {/* Vignette to keep type readable */}
+        <div
+          aria-hidden
+          className="absolute inset-0 z-[1]"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(26,27,38,0.30) 0%, rgba(26,27,38,0.70) 60%, rgba(26,27,38,0.92) 100%)',
+          }}
+        />
+        {/* Grain — same SVG as the hero */}
+        <div className={hero.grain} />
+
+        <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 text-center">
+          <span className="font-mono text-xs uppercase tracking-[0.3em] text-white/55">
+            006 / Get started
+          </span>
+          <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-5xl">
+            Ten free credits. No card.
+            <br />
+            Start finding emails in 60 seconds.
           </h2>
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Button asChild size="lg">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <Button
+              asChild
+              size="lg"
+              className="h-12 bg-white px-7 text-base text-foreground hover:bg-white/90"
+            >
               <Link href="/signup">Get started</Link>
             </Button>
-            <Button asChild variant="ghost" size="lg">
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-12 border-white/30 bg-white/10 px-7 text-base text-white backdrop-blur hover:bg-white/20 hover:text-white"
+            >
               <Link href="/login">Sign in</Link>
             </Button>
           </div>

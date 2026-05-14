@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, Loader2, ArrowLeft, Mail, CheckCircle2 } from "lucide-react"
+import { Loader2, ArrowLeft, Mail, CheckCircle2 } from "lucide-react"
+import { Wordmark } from "@/components/marketing/wordmark"
+import { AuthBackdrop } from "@/components/marketing/auth-backdrop"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function ForgotPasswordPage() {
@@ -29,18 +31,15 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-svh flex-col">
       {/* Header */}
       <header className="flex h-14 items-center justify-between border-b px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold text-foreground">Acme</span>
+        <Link href="/" className="flex items-center gap-2" aria-label="scoop home">
+          <Wordmark className="text-lg" />
         </Link>
         <ThemeToggle />
       </header>
 
       {/* Main content */}
-      <main className="flex flex-1 items-center justify-center p-6">
-        <Card className="w-full max-w-sm">
+      <AuthBackdrop>
+        <Card className="w-full">
           {!isSubmitted ? (
             <>
               <CardHeader className="space-y-1 text-center">
@@ -147,7 +146,7 @@ export default function ForgotPasswordPage() {
             </>
           )}
         </Card>
-      </main>
+      </AuthBackdrop>
     </div>
   )
 }

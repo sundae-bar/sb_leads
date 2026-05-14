@@ -1,19 +1,22 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Wordmark } from './wordmark';
 
 export function MarketingTopNav() {
   return (
-    <header className="border-b border-border/40">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2 font-mono text-sm font-medium tracking-tight">
-          <span className="text-foreground">sundae_bar</span>
-          <span className="text-muted-foreground">/leads</span>
+    <header className="sticky top-0 z-20 border-b border-border bg-background">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-6">
+        <Link href="/" aria-label="scoop home" className="flex items-center">
+          <Wordmark className="text-xl" />
         </Link>
-        <nav className="flex items-center gap-2 text-sm">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/login">Sign in</Link>
-          </Button>
-          <Button asChild size="sm">
+        <nav className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            Sign in
+          </Link>
+          <Button asChild size="sm" className="h-9 px-4">
             <Link href="/signup">Get started</Link>
           </Button>
         </nav>

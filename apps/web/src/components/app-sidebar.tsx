@@ -10,8 +10,9 @@ import {
   LogOut,
   ChevronsUpDown,
   User,
-  Sparkles,
+  Users,
 } from "lucide-react"
+import { Wordmark } from "@/components/marketing/wordmark"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -46,6 +47,13 @@ const navItems = [
     title: "Dashboard",
     href: "/app",
     icon: LayoutDashboard,
+    // Exact match — /app/* sub-routes have their own entries below.
+    exact: true,
+  },
+  {
+    title: "Leads",
+    href: "/app/leads",
+    icon: Users,
   },
   {
     title: "Chat",
@@ -57,7 +65,7 @@ const navItems = [
     href: "/app/settings",
     icon: Settings,
   },
-]
+] satisfies { title: string; href: string; icon: typeof LayoutDashboard; exact?: boolean }[]
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -115,14 +123,16 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/app">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Sparkles className="size-4" />
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
+                  <span className="font-wordmark text-[15px] font-bold leading-none">
+                    s<sup className="ml-[0.05em] text-[0.55em] align-super">_</sup>
+                  </span>
                 </div>
                 {showLogoText && (
                   <div className="flex flex-col gap-0.5 leading-none animate-in fade-in duration-200">
-                    <span className="font-semibold">Acme</span>
+                    <Wordmark className="text-base" />
                     <span className="text-xs text-muted-foreground">
-                      Dashboard
+                      Email lead-gen
                     </span>
                   </div>
                 )}
@@ -138,10 +148,9 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isActive =
-                  item.href === "/"
-                    ? pathname === "/"
-                    : pathname.startsWith(item.href)
+                const isActive = item.exact
+                  ? pathname === item.href
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`)
 
                 return (
                   <SidebarMenuItem key={item.title}>

@@ -3,40 +3,70 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─────────────────────────────────────────────────────────────────
+   sundae_bar → scoop design tokens.
+   Source of truth: Claude Design handoff bundle (`colors_and_type.css`).
+   Foreground is warm-navy #1A1B26, never pure black.
+   Accent is brand purple #615FFF.
+   Four pastel "flavor" pairs (blue/orange/green/pink) live alongside
+   the shadcn variables so marketing components can opt into them.
+   ───────────────────────────────────────────────────────────────── */
+
 :root {
-  --background: oklch(0.98 0.002 250);
-  --foreground: oklch(0.17 0.02 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.17 0.02 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.17 0.02 260);
-  --primary: oklch(0.45 0.12 250);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.005 250);
-  --secondary-foreground: oklch(0.30 0.03 260);
-  --muted: oklch(0.95 0.005 250);
-  --muted-foreground: oklch(0.50 0.02 260);
-  --accent: oklch(0.93 0.01 250);
-  --accent-foreground: oklch(0.25 0.03 260);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0.005 250);
-  --input: oklch(0.91 0.005 250);
-  --ring: oklch(0.45 0.12 250);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /* shadcn-named tokens — values rebuilt to match the design system */
+  --background: oklch(100% 0 0);                /* #FFFFFF */
+  --foreground: oklch(22.63% 0.0214 280.5);     /* #1A1B26 warm-navy */
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(22.63% 0.0214 280.5);
+  --popover: oklch(100% 0 0);
+  --popover-foreground: oklch(22.63% 0.0214 280.5);
+
+  /* Brand purple #615FFF — the single accent */
+  --primary: oklch(58.42% 0.2356 273.5);
+  --primary-foreground: oklch(100% 0 0);
+
+  --secondary: oklch(97.02% 0 0);               /* gray-200 */
+  --secondary-foreground: oklch(22.63% 0.0214 280.5);
+
+  --muted: oklch(98.21% 0 0);                   /* gray-100 */
+  --muted-foreground: oklch(64.01% 0 0);        /* slate-blue text-secondary ≈ #8084A7 */
+
+  --accent: oklch(94.88% 0.0217 256.7);         /* blue-100 wash */
+  --accent-foreground: oklch(22.63% 0.0214 280.5);
+
+  --destructive: oklch(64% 0.22 25);            /* status red */
+  --destructive-foreground: oklch(100% 0 0);
+
+  --border: oklch(93.4% 0 0);                   /* gray-300 #E9E9E9 */
+  --input: oklch(93.4% 0 0);
+  --ring: oklch(58.42% 0.2356 273.5);           /* same as primary */
+
+  --chart-1: oklch(58.42% 0.2356 273.5);        /* brand purple */
+  --chart-2: oklch(65.04% 0.1166 180.0);        /* brand green */
+  --chart-3: oklch(70.80% 0.1754 55.0);         /* brand orange */
+  --chart-4: oklch(63.30% 0.2273 351.0);        /* brand pink */
+  --chart-5: oklch(77.53% 0.1040 264.7);        /* secondary blue */
+
   --radius: 0.625rem;
-  --sidebar: oklch(0.99 0.002 250);
-  --sidebar-foreground: oklch(0.17 0.02 260);
-  --sidebar-primary: oklch(0.45 0.12 250);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.94 0.01 250);
-  --sidebar-accent-foreground: oklch(0.25 0.03 260);
-  --sidebar-border: oklch(0.91 0.005 250);
-  --sidebar-ring: oklch(0.45 0.12 250);
+
+  --sidebar: oklch(98.21% 0 0);
+  --sidebar-foreground: oklch(22.63% 0.0214 280.5);
+  --sidebar-primary: oklch(58.42% 0.2356 273.5);
+  --sidebar-primary-foreground: oklch(100% 0 0);
+  --sidebar-accent: oklch(94.88% 0.0217 256.7);
+  --sidebar-accent-foreground: oklch(22.63% 0.0214 280.5);
+  --sidebar-border: oklch(93.4% 0 0);
+  --sidebar-ring: oklch(58.42% 0.2356 273.5);
+
+  /* ─── Four flavour pairs — opt-in for marketing surfaces ─── */
+  --flavor-blue-bg:    #E5EFFD;
+  --flavor-blue-fg:    #615FFF;
+  --flavor-orange-bg:  #FFECE0;
+  --flavor-orange-fg:  #FEC5A2;
+  --flavor-green-bg:   #E6F6F4;
+  --flavor-green-fg:   #0AA692;
+  --flavor-pink-bg:    #FEF4FB;
+  --flavor-pink-fg:    #EF27A6;
 }
 
 .dark {
@@ -75,8 +105,9 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: var(--font-geist-sans), 'Geist', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --font-wordmark: var(--font-plus-jakarta), 'Plus Jakarta Sans', 'Geist', sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

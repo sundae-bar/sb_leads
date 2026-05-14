@@ -1,0 +1,221 @@
+/* ──────────────────────────────────────────────────────────────
+   Scoop launch hero. Lifted near-verbatim from the design bundle's
+   `scoop/scoop-styles.css`, trimmed to the landing-hero variant
+   and CSS-module-scoped so utility classes don't collide.
+   Source: ~/Downloads/sundae-bar-design-system/project/scoop/
+   ────────────────────────────────────────────────────────────── */
+
+.card {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 720px;
+  max-height: 1080px;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: #fff;
+  background: #1a1b26;
+  box-sizing: border-box;
+  --cr-pad: 64px;
+  --cr-gap: 40px;
+}
+
+@media (max-width: 768px) {
+  .card {
+    min-height: 640px;
+    --cr-pad: 32px;
+    --cr-gap: 24px;
+  }
+}
+
+/* Saturated blob fills the canvas */
+.bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Vignette so the type is readable */
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(26, 27, 38, 0.30) 0%,
+    rgba(26, 27, 38, 0.70) 60%,
+    rgba(26, 27, 38, 0.92) 100%
+  );
+  z-index: 2;
+}
+
+/* Subtle film-grain overlay */
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0.1;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Top tag row — `· NEW` on the left, eyebrow lives in centre stack */
+.tagRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  z-index: 6;
+  padding: var(--cr-pad);
+}
+.tag {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.72);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+.tag::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: #fec5a2;
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(254, 197, 162, 0.6);
+}
+
+/* Centre stack */
+.stack {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  z-index: 5;
+  box-sizing: border-box;
+  padding: var(--cr-pad);
+  gap: var(--cr-gap);
+}
+
+/* Eyebrow */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: rgba(255, 255, 255, 0.65);
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+.eyebrow .bar {
+  width: 36px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+/* The scoop wordmark — big display sans */
+.wordmark {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.92;
+  color: #fff;
+  margin: 0;
+  text-shadow: 0 12px 80px rgba(0, 0, 0, 0.35);
+  font-size: clamp(160px, 18vw, 320px);
+}
+.sbMark {
+  font-size: 0.08em;
+  font-weight: 300;
+  letter-spacing: 0;
+  color: #fff;
+  vertical-align: top;
+  line-height: 1;
+  margin-left: 0.04em;
+  position: relative;
+  top: 1.4em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4em;
+  height: 2.4em;
+  border-radius: 999px;
+  border: 0.06em solid rgba(255, 255, 255, 0.75);
+  box-sizing: border-box;
+  opacity: 0.85;
+}
+
+/* Tagline below */
+.tagline {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: clamp(20px, 2.2vw, 32px);
+  color: rgba(255, 255, 255, 0.78);
+  letter-spacing: -0.005em;
+  line-height: 1.35;
+  margin: 0;
+  text-wrap: balance;
+  max-width: 60%;
+}
+.tagline em {
+  font-style: normal;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Watermark — bottom-right */
+.watermark {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  z-index: 6;
+  right: var(--cr-pad);
+  bottom: var(--cr-pad);
+}
+.trainedBy {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Floating CTA row, anchored bottom-centre on the hero canvas */
+.ctaRow {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--cr-pad) + 60px);
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 768px) {
+  .ctaRow {
+    bottom: calc(var(--cr-pad) + 80px);
+    flex-direction: column;
+  }
+}

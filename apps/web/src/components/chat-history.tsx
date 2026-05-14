@@ -79,8 +79,8 @@ export function ChatHistory({
         try {
           await deleteConversation.mutateAsync(id)
           if (activeId === id) {
-            // Redirect to /chat when deleting the active conversation
-            router.push("/chat")
+            // Redirect to /app/chat when deleting the active conversation
+            router.push("/app/chat")
             router.refresh()
           }
           toast.success("Conversation deleted")

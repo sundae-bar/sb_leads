@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { AuthBackdrop } from '@/components/marketing/auth-backdrop';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -54,8 +55,8 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <AuthBackdrop fullHeight innerClassName="max-w-md">
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Create your workspace</CardTitle>
           <CardDescription>
@@ -68,7 +69,7 @@ export default function OnboardingPage() {
               <Label htmlFor="workspaceName">Workspace name</Label>
               <Input
                 id="workspaceName"
-                placeholder="Acme Inc."
+                placeholder="Your workspace"
                 value={workspaceName}
                 onChange={(e) => setWorkspaceName(e.target.value)}
                 required
@@ -80,6 +81,6 @@ export default function OnboardingPage() {
           </form>
         </CardContent>
       </Card>
-    </div>
+    </AuthBackdrop>
   );
 }

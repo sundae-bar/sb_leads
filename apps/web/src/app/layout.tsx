@@ -1,40 +1,38 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist, Geist_Mono, Plus_Jakarta_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Providers } from './providers'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
-const geistSans = Geist({ 
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
+// Geist = body + UI + headings. Geist Mono = code + captions.
+// Plus Jakarta Sans = the `scoop` wordmark ONLY (per the design-system rules).
+const geistSans = Geist({
+  subsets: ['latin'],
+  variable: '--font-geist-sans',
 });
-const geistMono = Geist_Mono({ 
-  subsets: ["latin"],
-  variable: "--font-geist-mono",
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  variable: '--font-geist-mono',
+});
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+  variable: '--font-plus-jakarta',
 });
 
 export const metadata: Metadata = {
-  title: 'Acme Dashboard',
-  description: 'Manage your workspace, chat with AI, and configure settings',
-  generator: 'v0.app',
+  title: 'scoop · Email lead-gen for AI agents',
+  description:
+    'Verified emails for any LinkedIn profile, billed per result. Refunded automatically when nothing is found. An agent skill in the sundae_bar portfolio.',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    // Scoop "agent-blob-07-purple-cyan" mark from the sundae_bar design system.
+    // Single high-res PNG — browsers downscale to favicon sizes; iOS uses it
+    // as the home-screen icon.
+    icon: { url: '/icon.png', type: 'image/png' },
+    shortcut: '/icon.png',
+    apple: '/icon.png',
   },
 }
 
@@ -44,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${jakarta.variable}`}>
       <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"

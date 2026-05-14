@@ -209,7 +209,7 @@ export function ChatInterface() {
                 currentConvId = parsed.conversationId
                 setConversationId(currentConvId)
                 // Update URL without triggering navigation that might refetch
-                router.replace(`/chat?conversation=${currentConvId}`, { scroll: false })
+                router.replace(`/app/chat?conversation=${currentConvId}`, { scroll: false })
               }
             } catch (e) {
               // Ignore parse errors
@@ -252,11 +252,11 @@ export function ChatInterface() {
         onSelect={(id) => {
           if (id) {
             setConversationId(id)
-            router.push(`/chat?conversation=${id}`)
+            router.push(`/app/chat?conversation=${id}`)
             router.refresh()
           } else {
             setConversationId(null)
-            router.push("/chat")
+            router.push("/app/chat")
             router.refresh()
           }
         }}

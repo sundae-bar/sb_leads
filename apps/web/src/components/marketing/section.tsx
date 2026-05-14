@@ -21,7 +21,7 @@ export function MarketingSection({
   className,
 }: Props) {
   return (
-    <section className={cn('w-full border-t border-border/40 py-20', className)}>
+    <section className={cn('w-full py-20', className)}>
       <div className="mx-auto w-full max-w-6xl px-6">
         <div className="mb-10 flex flex-col gap-3">
           <span className="font-mono text-xs text-muted-foreground">{number}/</span>

@@ -58,6 +58,15 @@ export const PROVIDER_COLUMNS: { id: ProviderName; label: string; canFind: boole
 interface Props {
   results: FindEmailResult[];
   creditsRemaining: number;
+  /**
+   * How to render the empty state.
+   * - `card` (default): big dashed-border card prompting the user to search.
+   *   Right for the dashboard, where the table is paired with a finder form.
+   * - `table`: keep the table chrome (headers, search, pagination) and show
+   *   "No leads yet" inside the body. Right for browse pages where the user
+   *   expects to see the structure even when empty.
+   */
+  emptyState?: 'card' | 'table';
 }
 
 interface PendingTopUp {
@@ -66,7 +75,7 @@ interface PendingTopUp {
   providerLabel: string;
 }
 
-export function ContactsTable({ results, creditsRemaining }: Props) {
+export function ContactsTable({ results, creditsRemaining, emptyState = 'card' }: Props) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [pending, setPending] = useState<PendingTopUp | null>(null);
@@ -235,7 +244,7 @@ export function ContactsTable({ results, creditsRemaining }: Props) {
     initialState: { pagination: { pageSize: 25 } },
   });
 
-  if (results.length === 0) {
+  if (results.length === 0 && emptyState === 'card') {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/30 py-20 text-center">
         <div className="flex size-10 items-center justify-center rounded-full bg-muted">
@@ -310,9 +319,23 @@ export function ContactsTable({ results, creditsRemaining }: Props) {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-sm text-muted-foreground">
-                  No results match &quot;{globalFilter}&quot;.
+              <TableRow className="hover:bg-transparent">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-32 text-center text-sm text-muted-foreground"
+                >
+                  {globalFilter ? (
+                    <>No leads match &quot;{globalFilter}&quot;.</>
+                  ) : results.length === 0 ? (
+                    <div className="flex flex-col items-center gap-1 py-4">
+                      <p className="font-medium text-foreground">No leads yet</p>
+                      <p className="text-xs">
+                        Head to the Email finder and paste a LinkedIn URL — leads land here.
+                      </p>
+                    </div>
+                  ) : (
+                    'No results on this page.'
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

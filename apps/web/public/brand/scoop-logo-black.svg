@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000">
+  
+  <g fill="#1A1B26">
+    <text class="word" x="700" y="680" text-anchor="middle">scoop</text>
+    <g transform="translate(1240 290)" opacity="0.85">
+      <circle r="60" fill="none" stroke="#1A1B26" stroke-width="5"></circle>
+      <text class="mark" x="0" y="16" text-anchor="middle" fill="#1A1B26">s_</text>
+    </g>
+  </g>
+</svg>
