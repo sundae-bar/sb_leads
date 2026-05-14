@@ -18,10 +18,6 @@ interface The402WebhookEvent {
 
 const API_URL = process.env.THE402_API_URL ?? 'https://api.the402.ai';
 
-function isFindEmailService(name: string | undefined): boolean {
-  return name === 'find_email';
-}
-
 async function deliverResult(
   callbackUrl: string,
   deliverable: Record<string, unknown>,
@@ -123,7 +119,7 @@ export async function handleThe402Webhook(req: Request, res: Response): Promise<
     const service = LISTED_SERVICES.find(
       (s) => s.name === event.service_name || s.name === event.service_id,
     );
-    if (!service || !isFindEmailService(service.name)) {
+    if (!service) {
       throw new Error(`unknown_service:${event.service_name ?? event.service_id}`);
     }
 
