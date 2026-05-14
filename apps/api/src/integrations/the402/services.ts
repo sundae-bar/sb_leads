@@ -37,7 +37,10 @@ const normalizedEmailSchema = {
 
 export const LISTED_SERVICES: readonly The402Service[] = [
   {
-    name: 'find_email',
+    // Must match the service name in the402's dashboard. Buyers see this string
+    // in the marketplace; our webhook handler matches incoming `service_name`
+    // against this value to route the job.
+    name: 'Scoop',
     service_type: 'data_api',
     pricing_model: 'fixed',
     // Covers our provider cost (~$0.05-0.15 depending on hit) plus margin.

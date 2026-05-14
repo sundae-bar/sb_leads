@@ -160,6 +160,16 @@ export async function handleThe402Webhook(req: Request, res: Response): Promise<
 
     await deliverResult(event.callback_url, deliverable);
 
+    logger.info(
+      {
+        event_id: event.id,
+        service: service.name,
+        callback: event.callback_url,
+        emails_found: deliverable.emails.length,
+      },
+      'the402 job delivered',
+    );
+
     await adminDb
       .from('the402_events')
       .update({ processed_at: new Date().toISOString() })
