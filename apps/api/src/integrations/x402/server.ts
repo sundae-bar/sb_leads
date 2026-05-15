@@ -9,6 +9,13 @@ import { HTTPFacilitatorClient, x402ResourceServer } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 import type { Network } from '@x402/core/types';
 
+// NOTE on refund-on-empty: `exact` is all-or-nothing — facilitator rejects
+// partial settlement, so we can't refund the buyer in-protocol when
+// findEmails returns no hits. The `upto` scheme supports it but requires
+// Permit2 approvals on the buyer side, which most x402 clients don't
+// implement. We accept "no refund on x402" as a deliberate tradeoff; the
+// dashboard + the402 paths still refund. Revisit if buyers ask.
+
 const FACILITATOR_URL =
   process.env.X402_FACILITATOR_URL ?? 'https://x402.org/facilitator';
 const NETWORK = (process.env.X402_NETWORK ?? 'eip155:84532') as Network; // Base Sepolia by default

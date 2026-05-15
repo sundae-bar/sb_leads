@@ -45,6 +45,9 @@ x402FindEmailRouter.post('/x402/find-email', async (req, res, next) => {
       providers_attempted: result?.providers_attempted ?? [],
     };
 
+    // NOTE: x402 `exact` scheme is all-or-nothing — there's no in-protocol
+    // refund mechanism. Buyers pay the full quote regardless of whether
+    // findEmails returns hits. Dashboard + the402 paths still refund.
     logger.info(
       {
         request_id: requestId,
