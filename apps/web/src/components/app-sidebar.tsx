@@ -236,7 +236,7 @@ export function AppSidebar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/settings?tab=team">
+                    <Link href="/app/settings?tab=team">
                       <Settings className="mr-2 size-4" />
                       Settings
                     </Link>
