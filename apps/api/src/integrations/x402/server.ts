@@ -7,6 +7,7 @@
 import { paymentMiddleware } from '@x402/express';
 import { HTTPFacilitatorClient, x402ResourceServer } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
+import { createFacilitatorConfig } from '@coinbase/x402';
 import type { Network } from '@x402/core/types';
 
 // NOTE on refund-on-empty: `exact` is all-or-nothing — facilitator rejects
@@ -29,7 +30,18 @@ if (!PAY_TO) {
   );
 }
 
-const facilitator = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
+// The CDP mainnet facilitator requires Ed25519-signed CDP auth headers on
+// every request; the testnet x402.org facilitator is unauthenticated. We
+// detect which mode we're in by the presence of CDP_API_KEY_ID and use
+// Coinbase's helper to build the auth-aware FacilitatorConfig.
+const cdpKeyId = process.env.CDP_API_KEY_ID;
+const cdpKeySecret = process.env.CDP_API_KEY_SECRET;
+const facilitatorConfig =
+  cdpKeyId && cdpKeySecret
+    ? createFacilitatorConfig(cdpKeyId, cdpKeySecret)
+    : { url: FACILITATOR_URL };
+
+const facilitator = new HTTPFacilitatorClient(facilitatorConfig);
 
 const server = new x402ResourceServer(facilitator).register(
   NETWORK,
