@@ -1,6 +1,10 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Plus_Jakarta_Sans } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
+// `@vercel/analytics` deliberately not used — we're on Railway, not Vercel.
+// The component injects <script src="/_vercel/insights/script.js"> which only
+// resolves on Vercel's edge; on Railway it 502s and the browser tries to
+// parse the error response as JS. Swap for PostHog / similar if we need
+// analytics back.
 import { ThemeProvider } from '@/components/theme-provider'
 import { Providers } from './providers'
 import { Toaster } from '@/components/ui/sonner'
@@ -55,7 +59,6 @@ export default function RootLayout({
             <Toaster />
           </Providers>
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )
