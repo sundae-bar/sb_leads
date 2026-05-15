@@ -1,5 +1,5 @@
 {
-  "name": "@agent-starter/web",
+  "name": "@sundae/web",
   "version": "0.0.1",
   "private": true,
   "scripts": {

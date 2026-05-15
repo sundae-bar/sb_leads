@@ -54,8 +54,18 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Unauthenticated users → /login (except auth pages and onboarding).
-  if (!user && !isAuthRoute(pathname) && pathname !== '/onboarding') {
+  // Unauthenticated users → /login (except auth pages, onboarding, and
+  // /api/* routes). API routes are intentionally exempt because:
+  //  - /api/auth/callback runs to exchange the OAuth code for a session
+  //    cookie; the user is *deliberately* unauthed when it runs.
+  //  - other API routes return their own 401 JSON; the middleware shouldn't
+  //    replace those with an HTML redirect.
+  if (
+    !user &&
+    !isAuthRoute(pathname) &&
+    pathname !== '/onboarding' &&
+    !pathname.startsWith('/api/')
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
