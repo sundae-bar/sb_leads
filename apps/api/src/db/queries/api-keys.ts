@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ApiKey } from '@sundae/types';
+import type { ApiKey } from '@scoop/types';
 import { encrypt } from '../../lib/encryption.js';
 import { adminDb } from '../admin.js';
 

@@ -43,7 +43,7 @@ import {
 import { toast } from 'sonner';
 import { TopUpDialog } from './top-up-dialog';
 import { useLeads } from '@/hooks/useLeads';
-import type { FindEmailResult, ProviderName } from '@sundae/types';
+import type { FindEmailResult, ProviderName } from '@scoop/types';
 
 /** All provider columns shown in the table — order matters (left to right). */
 export const PROVIDER_COLUMNS: { id: ProviderName; label: string; canFind: boolean }[] = [

@@ -3,7 +3,7 @@ import { isProviderConfigured } from '../config.js';
 import { logCredit } from '../credits.js';
 import { HttpError } from '../middleware/error.js';
 import { DEFAULT_VERIFIER, verifiers } from '../providers/registry.js';
-import type { VerifyEmailResult } from '@sundae/types';
+import type { VerifyEmailResult } from '@scoop/types';
 
 export interface VerifyEmailOptions {
   email: string;

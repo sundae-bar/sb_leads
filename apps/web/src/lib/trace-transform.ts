@@ -1,4 +1,4 @@
-import type { AgentRun, AgentRunStep } from '@sundae/types';
+import type { AgentRun, AgentRunStep } from '@scoop/types';
 import type { Trace, TraceStep } from './traces-data';
 
 // Status mapping: DB format → UI format

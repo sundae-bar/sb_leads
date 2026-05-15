@@ -2,7 +2,7 @@
 // and print its address. Run once during initial setup; never again.
 //
 // Usage:
-//   pnpm --filter @sundae/api cdp:create-eoa
+//   pnpm --filter @scoop/api cdp:create-eoa
 //
 // Requires the following in .env:
 //   CDP_API_KEY_ID

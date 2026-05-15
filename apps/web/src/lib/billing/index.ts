@@ -4,7 +4,7 @@ import {
   type Feature,
   type PlanId,
   type PlanConfig,
-} from '@sundae/types';
+} from '@scoop/types';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe } from './stripe';
 

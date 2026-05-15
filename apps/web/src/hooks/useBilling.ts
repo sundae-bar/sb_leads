@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PlanConfig, PlanId, Feature } from '@sundae/types';
+import type { PlanConfig, PlanId, Feature } from '@scoop/types';
 
 export interface SubscriptionResponse {
   planId: PlanId;

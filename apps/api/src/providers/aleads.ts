@@ -11,7 +11,7 @@ import type {
   PerUrlFinderResult,
 } from "./types.js";
 import { ProviderError } from "./types.js";
-import type { FindEmailHints, IntentSignal, NormalizedEmail } from "@sundae/types";
+import type { FindEmailHints, IntentSignal, NormalizedEmail } from "@scoop/types";
 
 const BASE = "https://api.a-leads.co/gateway/v1";
 const PLACEHOLDER_EMAIL_RE = /email_not_unlocked@/i;

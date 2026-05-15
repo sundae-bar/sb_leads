@@ -12,7 +12,7 @@ import type {
   IntentSignal,
   IntentSignalsResult,
   ProviderAttempt,
-} from '@sundae/types';
+} from '@scoop/types';
 
 export interface IntentOptions {
   linkedin_url?: string;

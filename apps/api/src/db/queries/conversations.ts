@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Conversation } from '@sundae/types';
+import type { Conversation } from '@scoop/types';
 
 // All read queries rely on RLS for tenant scoping (policies in 0009/0010).
 // Writes still set user_id / tenant_id explicitly so the row is correctly tagged

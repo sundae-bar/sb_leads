@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import type { ProviderName, EmailType } from '@sundae/types';
+import type { ProviderName, EmailType } from '@scoop/types';
 import type { FindEmailParams } from '@/hooks/useLeads';
 
 const PROVIDERS: { id: ProviderName; label: string }[] = [

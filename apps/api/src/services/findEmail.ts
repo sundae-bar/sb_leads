@@ -15,7 +15,7 @@ import type {
   HintsByUrl,
   NormalizedEmail,
   ProviderAttempt,
-} from "@sundae/types";
+} from "@scoop/types";
 
 export interface FindEmailOptions {
   linkedin_urls: string[];

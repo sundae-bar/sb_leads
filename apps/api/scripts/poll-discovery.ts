@@ -1,8 +1,8 @@
 // Poll Coinbase Bazaar + agentic.market until Scoop appears.
 //
 // Usage:
-//   pnpm --filter @sundae/api discovery:poll
-//   pnpm --filter @sundae/api discovery:poll once   # single check, no loop
+//   pnpm --filter @scoop/api discovery:poll
+//   pnpm --filter @scoop/api discovery:poll once   # single check, no loop
 //
 // Bazaar is the source (Coinbase's discovery feed). agentic.market is a UI
 // that republishes from Bazaar. Bazaar usually picks us up within minutes

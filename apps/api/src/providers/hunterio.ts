@@ -8,7 +8,7 @@ import type {
   VerifyOutput,
 } from "./types.js";
 import { ProviderError } from "./types.js";
-import type { Company } from "@sundae/types";
+import type { Company } from "@scoop/types";
 
 const BASE = "https://api.hunter.io/v2";
 const MIN_DELAY_MS = 1000 / 15; // 15 req/sec

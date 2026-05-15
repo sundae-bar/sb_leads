@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthProvider } from '@/lib/auth';
-import type { TenantMemberResponse } from '@sundae/types';
+import type { TenantMemberResponse } from '@scoop/types';
 
 export async function GET() {
   const user = await getAuthProvider().getCurrentUser();

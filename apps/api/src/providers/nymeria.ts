@@ -8,7 +8,7 @@ import type {
   PerUrlFinderResult,
 } from "./types.js";
 import { ProviderError } from "./types.js";
-import type { NormalizedEmail } from "@sundae/types";
+import type { NormalizedEmail } from "@scoop/types";
 
 const BASE = "https://www.nymeria.io/api/v4";
 const BATCH_SIZE = 30;

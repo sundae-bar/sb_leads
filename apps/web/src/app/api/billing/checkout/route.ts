@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthProvider } from '@/lib/auth';
 import { stripe } from '@/lib/billing/stripe';
 import { ensureStripeCustomer } from '@/lib/billing';
-import { PLANS, type PlanId } from '@sundae/types';
+import { PLANS, type PlanId } from '@scoop/types';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthProvider().getCurrentUser();

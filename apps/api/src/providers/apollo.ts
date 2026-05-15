@@ -11,7 +11,7 @@ import type {
   PerUrlFinderResult,
 } from "./types.js";
 import { ProviderError } from "./types.js";
-import type { IntentSignal, NormalizedEmail } from "@sundae/types";
+import type { IntentSignal, NormalizedEmail } from "@scoop/types";
 
 const BASE = "https://api.apollo.io/api/v1";
 

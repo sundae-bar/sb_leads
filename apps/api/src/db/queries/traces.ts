@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { AgentRun, AgentRunStep } from '@sundae/types';
+import type { AgentRun, AgentRunStep } from '@scoop/types';
 
 export async function listAgentRuns(
   supabase: SupabaseClient,

@@ -6,7 +6,7 @@ import {
   type ProviderName,
   type EmailType,
   mergeFindEmailResult,
-} from '@sundae/types';
+} from '@scoop/types';
 
 export interface FindEmailParams {
   linkedin_url: string;

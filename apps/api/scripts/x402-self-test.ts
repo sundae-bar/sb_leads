@@ -11,7 +11,7 @@
 //      handler runs, the deliverable comes back.
 //
 // Usage:
-//   pnpm --filter @sundae/api x402:self-test
+//   pnpm --filter @scoop/api x402:self-test
 import 'dotenv/config';
 import { CdpClient } from '@coinbase/cdp-sdk';
 import { wrapFetchWithPayment, x402Client } from '@x402/fetch';

@@ -9,7 +9,7 @@ import {
   type ProviderAttempt,
   mergeEmails,
   mergeProviderAttempts,
-} from '@sundae/types';
+} from '@scoop/types';
 
 /**
  * Upsert a FindEmailResult into the tenant's contacts table, merging with any

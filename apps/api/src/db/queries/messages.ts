@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Message } from '@sundae/types';
+import type { Message } from '@scoop/types';
 
 export async function listMessages(
   supabase: SupabaseClient,

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@sundae/types'],
+  transpilePackages: ['@scoop/types'],
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
 };
 

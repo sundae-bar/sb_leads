@@ -7,7 +7,7 @@
 // To update or delete an existing service, use the the402 dashboard or extend
 // this script with the service id (saved on first create).
 //
-// Run with: pnpm --filter @sundae/api the402:sync
+// Run with: pnpm --filter @scoop/api the402:sync
 import 'dotenv/config';
 import { LISTED_SERVICES, type The402Service } from '../src/integrations/the402/services.js';
 

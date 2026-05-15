@@ -2,7 +2,7 @@
 // Mirrors apps/web/src/lib/billing/index.ts (kept thin to avoid web→api imports).
 import { adminDb } from '../db/admin.js';
 import { stripe } from './stripe.js';
-import { PLANS, type PlanId } from '@sundae/types';
+import { PLANS, type PlanId } from '@scoop/types';
 
 export type ConsumeResult =
   | { ok: true; remaining: number }

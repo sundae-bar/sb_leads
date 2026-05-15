@@ -83,7 +83,7 @@ After adding a provider, if it should be visible on the402's listing too, update
 3. **The REST route** (optional, only if humans need it) — see [findEmail.ts route](../apps/api/src/routes/findEmail.ts) as a template. Wire it into [index.ts](../apps/api/src/index.ts) behind `requireLeadsAuth` + `enrichmentLimit`.
 4. **The the402 listing** — add a new entry to `LISTED_SERVICES` in [services.ts](../apps/api/src/integrations/the402/services.ts) with its own input_schema / deliverable_schema. Then:
    ```bash
-   pnpm --filter @sundae/api the402:sync
+   pnpm --filter @scoop/api the402:sync
    ```
    You'll get back a new `svc_…` id.
 5. **The the402 webhook dispatcher** in [webhook.ts](../apps/api/src/integrations/the402/webhook.ts). The handler already finds the right service from `LISTED_SERVICES.find(s => s.name === event.service_name)` — but it then *only* knows how to call `findEmails()`. To dispatch by service:
@@ -127,7 +127,7 @@ After adding a provider, if it should be visible on the402's listing too, update
 
 ## 5. Migrations / things to remember
 
-- **Run `pnpm --filter @sundae/api the402:sync` after touching `services.ts`** — otherwise the402's listing diverges from our manifest.
+- **Run `pnpm --filter @scoop/api the402:sync` after touching `services.ts`** — otherwise the402's listing diverges from our manifest.
 - **Update Bazaar `tags` on x402** when adding categorically different services. Bazaar's search ranking uses them.
 - **Don't forget the deliverable schema.** It's not just documentation — Bazaar exposes it to buyers so their clients know what to parse. If you change what you return, update the schema in the same commit.
 - **Test all the front doors after a change.** A schema change can pass typecheck and break only the dashboard form. Run `pnpm typecheck && pnpm build && pnpm x402:self-test` plus a manual smoke test of the dashboard before pushing.

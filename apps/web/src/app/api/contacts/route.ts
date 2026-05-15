@@ -7,7 +7,7 @@ import {
   type ProviderAttempt,
   mergeEmails,
   mergeProviderAttempts,
-} from '@sundae/types';
+} from '@scoop/types';
 
 export async function GET() {
   const user = await getAuthProvider().getCurrentUser();

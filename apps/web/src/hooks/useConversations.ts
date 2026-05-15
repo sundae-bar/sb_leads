@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ConversationResponse, CreateConversationRequest } from '@sundae/types';
+import type { ConversationResponse, CreateConversationRequest } from '@scoop/types';
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {

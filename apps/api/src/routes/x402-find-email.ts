@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { findEmails } from '../services/findEmail.js';
 import { logger } from '../logger.js';
-import type { EmailType } from '@sundae/types';
+import type { EmailType } from '@scoop/types';
 
 const bodySchema = z.object({
   linkedin_url: z.string().url(),

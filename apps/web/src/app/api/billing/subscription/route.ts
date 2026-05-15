@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthProvider } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { PLANS, type PlanId } from '@sundae/types';
+import { PLANS, type PlanId } from '@scoop/types';
 
 /** GET /api/billing/subscription — current plan + credits + status. */
 export async function GET() {

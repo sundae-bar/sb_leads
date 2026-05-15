@@ -6,7 +6,7 @@ import type {
   IntentSignal,
   NormalizedEmail,
   Person,
-} from "@sundae/types";
+} from "@scoop/types";
 
 export interface FindEmailsInput {
   linkedin_urls: string[];
