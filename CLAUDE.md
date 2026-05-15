@@ -1,6 +1,8 @@
-# Agent Starter — orientation for Claude
+# Scoop (sb_leads) — orientation for Claude
 
-A pnpm monorepo starter for AI agent apps: Next.js web + Express API + Supabase + Vercel AI SDK. Multi-tenant with **RLS actively enforced via JWT app_metadata** — see [§ Tenancy](#tenancy).
+Scoop is the email-lead-generation product in the **sundae_bar** agent portfolio. Brand: `scoop` (lowercase, with sup `s_`) — never "Scoop" as a wordmark.
+
+A pnpm monorepo: Next.js web + Express API + Supabase + Vercel AI SDK. Multi-tenant with **RLS actively enforced via JWT app_metadata** — see [§ Tenancy](#tenancy). Same `findEmails()` service is exposed through **five** front doors (dashboard, chat, MCP, the402 marketplace, raw x402 endpoint) — see [§ Marketplace integrations](#marketplace-integrations).
 
 ## Source-of-truth docs
 
@@ -8,6 +10,10 @@ A pnpm monorepo starter for AI agent apps: Next.js web + Express API + Supabase 
 |---|---|
 | [README.md](README.md) | Setup, dev commands, deploy. Authoritative for "how do I run this?" |
 | [agent-starter-plan.md](agent-starter-plan.md) | Full build spec / target architecture. May be ahead of current code — treat as intent, not state. |
+| [docs/README.md](docs/README.md) | Engineering docs index. Start here for marketplace integration questions. |
+| [docs/the402.md](docs/the402.md) | the402.ai managed-marketplace path (webhook + USDC payouts, 5% fee). |
+| [docs/x402.md](docs/x402.md) | Raw x402 protocol endpoint at `/x402/find-email` (direct USDC on Base, listed on Coinbase Bazaar → agentic.market). |
+| [docs/extending.md](docs/extending.md) | Playbook for new input params, new providers, new services. |
 
 ## Workspace
 
@@ -93,6 +99,31 @@ Stripe-direct, per-tenant, with credit-based auto-rebill. Plans + features + the
 - **Adding a plan**: create the price in Stripe Dashboard → add to `PLANS` in [billing.ts](packages/types/src/billing.ts) → set `STRIPE_PRICE_<NAME>` env var. No DB migration.
 - **Feature gating**: `useHasFeature(feature)` (web), `hasFeature(supabase, feature)` (server).
 
+## Marketplace integrations
+
+Scoop runs on **five front doors** that all converge on `findEmails()` ([apps/api/src/services/findEmail.ts](apps/api/src/services/findEmail.ts)). When debugging a "where does this request go?" question, this table is the starting point:
+
+| Surface | Path | Audience | Auth | Billing |
+|---|---|---|---|---|
+| Dashboard | `/app` (Next.js) | Logged-in human in a tenant | Supabase JWT cookie | Internal credits (Stripe) |
+| Chat | `/app/chat` → Express `/api/v1/chat/stream` | Logged-in human | Supabase JWT | Internal credits (per-tool, via MCP) |
+| MCP | `POST /mcp` | External AI agent | API key (`Authorization: Bearer`) or JWT | Internal credits |
+| **the402 marketplace** | `POST /the402/webhook` | the402.ai buyers | HMAC signature from the402 | USDC on Base via the402 (5% fee) |
+| **x402 direct** | `POST /x402/find-email` | Any x402 client | Signed EIP-3009 payment proof | USDC on Base directly to our wallet |
+
+Both marketplace surfaces use the same `findEmails()` engine and the same deliverable JSON shape ([the402 services.ts](apps/api/src/integrations/the402/services.ts) declares both `input_schema` and `deliverable_schema`; the x402 endpoint mirrors them). Refund-on-empty works on the402 ([webhook.ts](apps/api/src/integrations/the402/webhook.ts)) and the internal paths but **not on x402** (`exact` scheme limitation — documented in [docs/x402.md](docs/x402.md)).
+
+- **For day-to-day questions** about either marketplace: read [docs/the402.md](docs/the402.md) and [docs/x402.md](docs/x402.md). They're 2-3 pages each and cover env vars, request/response shape, common operational moves.
+- **Adding a new input parameter** (e.g. let buyers pass `name + company` instead of just `linkedin_url`): see [docs/extending.md](docs/extending.md) §1.
+- **Adding a new sourcing provider** alongside Aleads/Apollo/Nymeria/ContactOut/Hunter: [docs/extending.md](docs/extending.md) §2.
+- **Adding a sibling service** (e.g. `verify_email`, `enrich_person`) — listed on both marketplaces: [docs/extending.md](docs/extending.md) §3.
+
+Operational scripts live in [apps/api/scripts/](apps/api/scripts/):
+- `pnpm the402:sync` — sync `LISTED_SERVICES` to the402's catalog after a manifest change.
+- `pnpm x402:self-test` — end-to-end protocol test (faucet → buyer wallet → payment → deliverable).
+- `pnpm cdp:create-eoa` — one-shot to mint the receiving CDP wallet (already done; ID is in `X402_PAY_TO_ADDRESS`).
+- `pnpm discovery:poll` — watch for Scoop appearing in Coinbase Bazaar + agentic.market.
+
 ## Dev workflow (compact — see README for full)
 
 ```bash
@@ -116,6 +147,9 @@ Useful: `pnpm typecheck`, `pnpm lint`, `pnpm test` (cross-tenant isolation suite
 - **JWT claim is the source of truth, but membership is the safety net.** A user removed from a tenant whose JWT still claims it gets a 403 from Express ("Active tenant is no longer valid") and is redirected to onboarding by the web.
 - **Trigger.dev is optional** — only runs when `TRIGGER_SECRET_KEY` is set.
 - **`apps/web/src_old/` is deprecated** — old code that pre-dates the multi-tenant refactor. Don't touch it.
+- **the402 service rename ≠ marketplace rename.** Renaming in [services.ts](apps/api/src/integrations/the402/services.ts) only changes our handler's lookup; the402's `svc_…` listing keeps the old name until you update it in their dashboard or `PATCH /v1/services/<id>`. Mismatch → `unknown_service` 500s.
+- **x402 facilitator auth differs by network.** Testnet (`x402.org/facilitator`) needs no auth — `HTTPFacilitatorClient({ url })` works. Mainnet (CDP) needs Ed25519 JWT headers — `HTTPFacilitatorClient(createFacilitatorConfig(id, secret))`. [server.ts](apps/api/src/integrations/x402/server.ts) picks the right one based on whether `CDP_API_KEY_ID` is set.
+- **CDP wallet address ≠ chain.** A single EVM EOA works on both Base mainnet *and* Base Sepolia — same `X402_PAY_TO_ADDRESS` across environments. Just funds aren't shared across chains.
 
 ## When in doubt
 
@@ -125,3 +159,6 @@ Useful: `pnpm typecheck`, `pnpm lint`, `pnpm test` (cross-tenant isolation suite
 - Auth flow on the web → [apps/web/src/proxy.ts](apps/web/src/proxy.ts), [apps/web/src/lib/auth/supabase.ts](apps/web/src/lib/auth/supabase.ts).
 - Auth flow on the API → [apps/api/src/middleware/auth.ts](apps/api/src/middleware/auth.ts).
 - RLS policies → [supabase/migrations/0009_tenant_rls.sql](supabase/migrations/0009_tenant_rls.sql), [0010_jwt_tenancy.sql](supabase/migrations/0010_jwt_tenancy.sql).
+- the402 marketplace → [docs/the402.md](docs/the402.md).
+- x402 protocol → [docs/x402.md](docs/x402.md).
+- Adding params / providers / new services → [docs/extending.md](docs/extending.md).

@@ -11,7 +11,8 @@
     "test": "vitest run --dir __tests__",
     "the402:sync": "tsx --env-file=../../.env scripts/sync-the402-services.ts",
     "cdp:create-eoa": "tsx --env-file=../../.env scripts/create-cdp-eoa.ts",
-    "x402:self-test": "tsx --env-file=../../.env scripts/x402-self-test.ts"
+    "x402:self-test": "tsx --env-file=../../.env scripts/x402-self-test.ts",
+    "discovery:poll": "tsx --env-file=../../.env scripts/poll-discovery.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.106",
