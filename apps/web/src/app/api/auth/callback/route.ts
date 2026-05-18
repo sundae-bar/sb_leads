@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 /**
@@ -27,13 +28,49 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/app';
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
+  if (!code) {
+    return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+  // Build the redirect response FIRST so we can attach cookies to it as
+  // exchangeCodeForSession sets them. Returning a fresh NextResponse from
+  // outside this block would lose the Set-Cookie headers (Next 15+ doesn't
+  // propagate cookies().set(...) onto redirect responses automatically).
+  const response = NextResponse.redirect(`${origin}${next}`);
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookieOptions: { name: 'sb-tenant-starter' },
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          // Write to both the request-scope store (for subsequent reads in
+          // this handler) AND the outgoing redirect response (so the browser
+          // actually gets the session cookie).
+          try {
+            cookieStore.set(name, value, options);
+          } catch {}
+          response.cookies.set(name, value, options);
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set(name, '', { ...options, maxAge: 0 });
+          } catch {}
+          response.cookies.set(name, '', { ...options, maxAge: 0 });
+        },
+      },
+    },
+  );
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+  }
+
+  return response;
 }
