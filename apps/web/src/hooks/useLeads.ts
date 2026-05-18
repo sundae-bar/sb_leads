@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { FindEmailResult, ProviderName, EmailType } from '@sundae/types';
+import type { FindEmailResult, ProviderName, EmailType } from '@/types';
 
 export interface FindEmailParams {
   linkedin_url: string;

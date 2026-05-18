@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { UserProfileResponse, UpdateProfileRequest, TenantMemberResponse } from '@sundae/types';
+import type { UserProfileResponse, UpdateProfileRequest, TenantMemberResponse } from '@/types';
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ApiKeyResponse, CreateApiKeyRequest, CreateApiKeyResponse } from '@sundae/types';
+import type { ApiKeyResponse, CreateApiKeyRequest, CreateApiKeyResponse } from '@/types';
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {

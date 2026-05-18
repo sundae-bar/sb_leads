@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthProvider } from '@/lib/auth';
-import type { AgentRun } from '@sundae/types';
+import type { AgentRun } from '@/types';
 import { transformAgentRunToTrace } from '@/lib/trace-transform';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';

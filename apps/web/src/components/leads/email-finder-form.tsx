@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import type { ProviderName, EmailType } from '@sundae/types';
+import type { ProviderName, EmailType } from '@/types';
 import type { FindEmailParams } from '@/hooks/useLeads';
 
 const PROVIDERS: { id: ProviderName; label: string }[] = [

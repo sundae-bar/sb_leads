@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
-import { PLANS } from '@sundae/types';
+import { PLANS } from '@/types';
 
 function slugify(name: string): string {
   return name

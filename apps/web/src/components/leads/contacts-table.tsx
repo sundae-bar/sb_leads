@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import type { FindEmailResult, ProviderName } from '@sundae/types';
+import type { FindEmailResult, ProviderName } from '@/types';
 
 const PROVIDER_LABELS: Record<ProviderName, string> = {
   aleads: 'Aleads',

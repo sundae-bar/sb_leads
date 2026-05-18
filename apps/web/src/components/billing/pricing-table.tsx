@@ -3,7 +3,7 @@
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PLANS, type Feature, type PlanId } from '@sundae/types';
+import { PLANS, type Feature, type PlanId } from '@/types';
 import { useCheckout } from '@/hooks/useBilling';
 import { toast } from 'sonner';
 

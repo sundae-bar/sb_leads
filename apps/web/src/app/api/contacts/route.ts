@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthProvider } from '@/lib/auth';
-import type { FindEmailResult } from '@sundae/types';
+import type { FindEmailResult } from '@/types';
 
 export async function GET() {
   const user = await getAuthProvider().getCurrentUser();

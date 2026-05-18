@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { stripe } from '@/lib/billing/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { PLANS, planIdFromStripePriceId, type PlanId } from '@sundae/types';
+import { PLANS, planIdFromStripePriceId, type PlanId } from '@/types';
 
 // Stripe webhooks need the raw request body for signature verification, and
 // the Node SDK needs the Node runtime (Edge breaks `crypto`).
