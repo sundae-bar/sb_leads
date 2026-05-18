@@ -1,18 +1,11 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 /**
  * Build the public-facing origin from forwarded headers when behind a proxy
  * (Railway → Cloudflare → Next on internal port 8080). Next's `new URL(request.url).origin`
- * uses whatever Host the inner server saw, which can be `http://localhost:8080`
- * — then we redirect the user to a private internal hostname they can't reach.
- *
- * Headers Railway sets:
- *   X-Forwarded-Proto: https
- *   X-Forwarded-Host:  scoop.sundaebar.ai
- *
- * Falls back to request.url's origin for local dev (no proxy = no forwarded headers).
+ * uses whatever Host the inner server saw, which can be `http://localhost:8080`.
  */
 function publicOrigin(request: Request): string {
   const proto = request.headers.get('x-forwarded-proto');
@@ -32,10 +25,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
   }
 
-  // Build the redirect response FIRST so we can attach cookies to it as
-  // exchangeCodeForSession sets them. Returning a fresh NextResponse from
-  // outside this block would lose the Set-Cookie headers (Next 15+ doesn't
-  // propagate cookies().set(...) onto redirect responses automatically).
+  // Build the redirect response FIRST so we can attach session cookies to it
+  // as exchangeCodeForSession sets them. Using getAll/setAll (the modern
+  // @supabase/ssr 0.5+ API) so the entire chunked-cookie write happens in
+  // one batch — the old per-cookie set callback dropped chunks on Next 15+.
   const response = NextResponse.redirect(`${origin}${next}`);
   const cookieStore = await cookies();
 
@@ -45,23 +38,22 @@ export async function GET(request: Request) {
     {
       cookieOptions: { name: 'sb-tenant-starter' },
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
-          // Write to both the request-scope store (for subsequent reads in
-          // this handler) AND the outgoing redirect response (so the browser
-          // actually gets the session cookie).
-          try {
-            cookieStore.set(name, value, options);
-          } catch {}
-          response.cookies.set(name, value, options);
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
-          } catch {}
-          response.cookies.set(name, '', { ...options, maxAge: 0 });
+        setAll(toSet) {
+          for (const { name, value, options } of toSet) {
+            // Update the request-scope store so any follow-up reads inside
+            // this handler see the new values.
+            try {
+              cookieStore.set(name, value, options);
+            } catch {
+              // ignore — server-component restrictions don't apply here
+            }
+            // The critical part: attach the cookie to the outgoing redirect
+            // response so the browser actually receives Set-Cookie headers.
+            response.cookies.set(name, value, options);
+          }
         },
       },
     },

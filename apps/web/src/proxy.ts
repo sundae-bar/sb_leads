@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -33,18 +33,20 @@ export async function proxy(request: NextRequest) {
     {
       cookieOptions: { name: 'sb-tenant-starter' },
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
+        getAll() {
+          return request.cookies.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set(name, value);
+        setAll(toSet) {
+          // Mutate the incoming request first so downstream reads in this
+          // middleware see fresh cookie values, then rebuild the response
+          // and attach every cookie to it.
+          for (const { name, value } of toSet) {
+            request.cookies.set(name, value);
+          }
           supabaseResponse = NextResponse.next({ request });
-          supabaseResponse.cookies.set(name, value, options);
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set(name, '');
-          supabaseResponse = NextResponse.next({ request });
-          supabaseResponse.cookies.set(name, '', { ...options, maxAge: 0 });
+          for (const { name, value, options } of toSet) {
+            supabaseResponse.cookies.set(name, value, options);
+          }
         },
       },
     },

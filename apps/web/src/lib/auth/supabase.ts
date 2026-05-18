@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import type { AuthProvider, AuthUser } from './types';
@@ -36,19 +36,14 @@ export class SupabaseAuthProvider implements AuthProvider {
     const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       cookieOptions: { name: COOKIE_NAME },
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
+        setAll(toSet) {
           try {
-            cookieStore.set(name, value, options);
-          } catch {
-            /* Server Component */
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
+            for (const { name, value, options } of toSet) {
+              cookieStore.set(name, value, options);
+            }
           } catch {
             /* Server Component */
           }
