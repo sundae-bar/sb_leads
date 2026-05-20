@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthProvider } from '@/lib/auth';
+import type { MessageResponse, ToolCallRecord } from '@scoop/types';
+
+// Map a raw `messages` row into the camelCase MessageResponse shape, lifting
+// `tool_calls` out of metadata so the UI can re-render inline result cards
+// without having to parse arbitrary metadata. We keep this on the route
+// boundary (rather than the DB query) so the DB types stay snake_case-free of
+// product concepts.
+function toMessageResponse(row: Record<string, unknown>): MessageResponse {
+  const metadata = (row.metadata ?? {}) as { tool_calls?: ToolCallRecord[] };
+  return {
+    id: row.id as string,
+    conversationId: row.conversation_id as string,
+    role: row.role as 'user' | 'assistant' | 'tool',
+    content: row.content as string,
+    toolCalls: Array.isArray(metadata.tool_calls) ? metadata.tool_calls : undefined,
+    createdAt: row.created_at as string,
+  };
+}
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,7 +45,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .eq('conversation_id', id)
     .order('created_at', { ascending: true });
 
-  return NextResponse.json({ ...conversation, messages: messages ?? [] });
+  return NextResponse.json({
+    ...conversation,
+    messages: (messages ?? []).map(toMessageResponse),
+  });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {

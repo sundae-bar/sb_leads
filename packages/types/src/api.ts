@@ -1,10 +1,51 @@
 import type { AgentRunStep } from './agent.js';
+import type {
+  Company,
+  FindEmailResult,
+  IntentSignalsResult,
+  NormalizedEmail,
+  Person,
+  ProviderAttempt,
+  VerifyEmailResult,
+} from './leads.js';
 
 // Chat
 export interface ChatStreamRequest {
   conversationId: string;
   message: string;
 }
+
+// Tool calls — rendered inline beneath assistant messages. The shape is a
+// discriminated union on `toolName` so the client can route to the right
+// renderer. `result` mirrors what the MCP tool returns (see
+// apps/api/src/mcp/tools.ts) — keep the shapes in sync.
+export interface ListContactsRow {
+  linkedin_url: string;
+  person: Person | null;
+  company: Company | null;
+  emails: NormalizedEmail[];
+  providers_attempted: ProviderAttempt[];
+  updated_at: string;
+}
+
+export interface ListContactsResult {
+  total: number;
+  offset: number;
+  limit: number;
+  contacts: ListContactsRow[];
+}
+
+export type FindEmailToolResult =
+  | FindEmailResult
+  | { results: FindEmailResult[]; credits_used: number };
+
+export type ToolCallRecord =
+  | { toolName: 'find_email'; toolCallId: string; result: FindEmailToolResult }
+  | { toolName: 'list_contacts'; toolCallId: string; result: ListContactsResult }
+  | { toolName: 'verify_email'; toolCallId: string; result: VerifyEmailResult }
+  | { toolName: 'get_intent_signals'; toolCallId: string; result: IntentSignalsResult }
+  // Unknown / future tools — render a minimal "tool ran" pill, no crash.
+  | { toolName: string; toolCallId: string; result: unknown };
 
 // Conversations
 export interface ConversationResponse {
@@ -29,6 +70,8 @@ export interface MessageResponse {
   conversationId: string;
   role: 'user' | 'assistant' | 'tool';
   content: string;
+  /** Inline tool-call renderings (find_email cards, list_contacts table, etc.). */
+  toolCalls?: ToolCallRecord[];
   createdAt: string;
 }
 
@@ -67,6 +110,7 @@ export interface UserProfileResponse {
   role: 'admin' | 'member';
   tenantRole: 'owner' | 'admin' | 'member';
   tenantId: string;
+  tenantName: string;
   isSuperAdmin: boolean;
 }
 

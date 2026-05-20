@@ -16,7 +16,11 @@ export async function GET() {
   if (error || !profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
 
   // auth.users email isn't on profiles — admin API is required.
-  const { data: authUser } = await createAdminClient().auth.admin.getUserById(user.id);
+  const admin = createAdminClient();
+  const [{ data: authUser }, { data: tenant }] = await Promise.all([
+    admin.auth.admin.getUserById(user.id),
+    admin.from('tenants').select('name').eq('id', user.tenantId).single(),
+  ]);
 
   return NextResponse.json({
     id: profile.id,
@@ -26,6 +30,7 @@ export async function GET() {
     role: profile.role,
     tenantRole: user.tenantRole,
     tenantId: user.tenantId,
+    tenantName: tenant?.name ?? 'Workspace',
     isSuperAdmin: user.isSuperAdmin,
   });
 }
@@ -48,7 +53,11 @@ export async function PUT(request: NextRequest) {
     .single();
   if (error || !data) return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
 
-  const { data: authUser } = await createAdminClient().auth.admin.getUserById(user.id);
+  const admin = createAdminClient();
+  const [{ data: authUser }, { data: tenant }] = await Promise.all([
+    admin.auth.admin.getUserById(user.id),
+    admin.from('tenants').select('name').eq('id', user.tenantId).single(),
+  ]);
 
   return NextResponse.json({
     id: data.id,
@@ -58,6 +67,7 @@ export async function PUT(request: NextRequest) {
     role: data.role,
     tenantRole: user.tenantRole,
     tenantId: user.tenantId,
+    tenantName: tenant?.name ?? 'Workspace',
     isSuperAdmin: user.isSuperAdmin,
   });
 }

@@ -87,7 +87,7 @@ chatRouter.post(
       });
 
       try {
-        const { text, totalTokens } = await runChatAgent({
+        const { text, totalTokens, toolCalls } = await runChatAgent({
           supabase,
           conversationId: conversationId!,
           userId,
@@ -106,6 +106,24 @@ chatRouter.post(
               clientDisconnected = true;
             }
           },
+          onToolResult: (record) => {
+            // Forward tool results to the client as a separate SSE frame so
+            // the UI can attach them to the in-flight assistant message and
+            // render cards/tables inline. The serialised payload can be
+            // large (full find_email result with provider attempts etc.) —
+            // SSE handles that fine; the client parses one event per line.
+            try {
+              if (!res.closed && !clientDisconnected) {
+                res.write(`data: ${JSON.stringify({ tool: record })}\n\n`);
+                if (typeof (res as unknown as { flush?: () => void }).flush === 'function') {
+                  (res as unknown as { flush: () => void }).flush();
+                }
+              }
+            } catch (writeErr) {
+              console.error('[chat] error writing tool result:', writeErr);
+              clientDisconnected = true;
+            }
+          },
         });
 
         if (clientDisconnected) {
@@ -119,7 +137,11 @@ chatRouter.post(
           conversationId: conversationId!,
           role: 'assistant',
           content: text,
-          metadata: { totalTokens, model: 'gpt-5-mini' },
+          // `tool_calls` is what powers re-rendering of inline result cards
+          // when the conversation is reloaded from history. Storing the
+          // structured tool result (not just the model's prose summary) is
+          // what makes the chat thread useful as a persistent record.
+          metadata: { totalTokens, model: 'gpt-5-mini', tool_calls: toolCalls },
         });
 
         if (isNewConversation) {

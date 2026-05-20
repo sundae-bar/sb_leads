@@ -1,7 +1,15 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ConversationResponse, CreateConversationRequest } from '@scoop/types';
+import type {
+  ConversationResponse,
+  CreateConversationRequest,
+  MessageResponse,
+} from '@scoop/types';
+
+export type ConversationDetailResponse = ConversationResponse & {
+  messages: MessageResponse[];
+};
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -26,7 +34,7 @@ export function useConversations() {
 export function useConversation(id: string | undefined) {
   return useQuery({
     queryKey: ['conversations', id],
-    queryFn: () => apiFetch<ConversationResponse & { messages: unknown[] }>(`/api/conversations/${id}`),
+    queryFn: () => apiFetch<ConversationDetailResponse>(`/api/conversations/${id}`),
     enabled: !!id,
   });
 }

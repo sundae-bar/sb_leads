@@ -22,7 +22,28 @@ import { verifyEmailRouter } from './routes/verifyEmail.js';
 
 const app = express();
 
-app.use(cors({ origin: process.env.WEB_URL ?? 'http://localhost:3000', credentials: true }));
+// CORS: API and web are on different domains in prod (scoop-api-production.up.railway.app
+// vs scoop.sundaebar.ai), so we need an explicit allow-list. `WEB_URL` accepts a
+// comma-separated list so the same env var works for prod ("https://scoop.sundaebar.ai")
+// and local dev ("http://localhost:3002,http://localhost:3000"). Origins are matched
+// exactly — we don't reflect arbitrary origins.
+const allowedOrigins = (process.env.WEB_URL ?? 'http://localhost:3000,http://localhost:3002')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // No origin header → server-to-server / curl / health checks. Allow.
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      logger.warn({ origin, allowedOrigins }, 'CORS rejected origin');
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
+    credentials: true,
+  }),
+);
 app.use(
   express.json({
     limit: '1mb',

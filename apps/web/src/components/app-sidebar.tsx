@@ -37,7 +37,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useUser } from "@/hooks/useUser"
-import { TenantSwitcher } from "@/components/tenant-switcher"
+import { WorkspaceSwitcher } from "@/components/workspace-switcher"
 import { createClient } from "@/lib/supabase/client"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -129,17 +129,19 @@ export function AppSidebar() {
                   </span>
                 </div>
                 {showLogoText && (
-                  <div className="flex flex-col gap-0.5 leading-none animate-in fade-in duration-200">
+                  <div className="flex items-center leading-none animate-in fade-in duration-200">
                     <Wordmark className="text-base" />
-                    <span className="text-xs text-muted-foreground">
-                      Email lead-gen
-                    </span>
                   </div>
                 )}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        {!isCollapsed && (
+          <div className="px-1 pt-1 animate-in fade-in duration-200">
+            <WorkspaceSwitcher />
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent>
@@ -173,7 +175,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <TenantSwitcher />
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
