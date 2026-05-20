@@ -1,6 +1,7 @@
 import { request } from "undici";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
+import { PROVIDER_CREDITS } from "./credits.js";
 import type {
   EmailFinder,
   FindEmailsInput,
@@ -8,7 +9,7 @@ import type {
   PerUrlFinderResult,
 } from "./types.js";
 import { ProviderError } from "./types.js";
-import type { NormalizedEmail } from "@scoop/types";
+import { type LeadIdentifier, type NormalizedEmail, leadKey } from "@scoop/types";
 
 const BASE = "https://www.nymeria.io/api/v4";
 const BATCH_SIZE = 30;
@@ -42,11 +43,12 @@ const headers = (): Record<string, string> => ({
 });
 
 const personToResult = (
-  url: string,
+  key: string,
+  fallbackUrl: string,
   p: NymeriaPerson | undefined,
   emailTypes: ReadonlyArray<"work" | "personal">,
 ): PerUrlFinderResult => {
-  if (!p) return { linkedin_url: url, emails: [] };
+  if (!p) return { lead_key: key, linkedin_url: fallbackUrl, emails: [] };
   const emails: NormalizedEmail[] = [];
   if (emailTypes.includes("work") && p.work_email) {
     emails.push({
@@ -71,7 +73,8 @@ const personToResult = (
     }
   }
   return {
-    linkedin_url: url,
+    lead_key: key,
+    linkedin_url: p.linkedin_url ?? fallbackUrl,
     emails,
     person: {
       first_name: p.first_name,
@@ -79,7 +82,7 @@ const personToResult = (
       full_name: p.full_name,
       title: p.job_title,
       location: [p.location_name, p.location_country].filter(Boolean).join(", ") || undefined,
-      linkedin_url: p.linkedin_url ?? url,
+      linkedin_url: p.linkedin_url ?? fallbackUrl,
     },
     company: p.job_company_name
       ? {
@@ -91,32 +94,53 @@ const personToResult = (
   };
 };
 
-const enrichBulk = async (urls: string[]): Promise<Array<NymeriaPerson | undefined>> => {
+/**
+ * Bulk enrich — Nymeria's batch endpoint takes a list of `params` objects.
+ * Each request can use either `profile` (URL) or name+company params.
+ * Mixed batches are fine; we attach our `lead_key` as metadata to match
+ * responses back even though Nymeria preserves request order.
+ */
+const enrichBulk = async (
+  leads: LeadIdentifier[],
+): Promise<Array<NymeriaPerson | undefined>> => {
+  const requests = leads.map((lead) => {
+    if (lead.kind === "linkedin") {
+      return {
+        params: { profile: lead.linkedin_url },
+        metadata: { lead_key: leadKey(lead) },
+      };
+    }
+    return {
+      params: {
+        first_name: lead.first_name,
+        last_name: lead.last_name,
+        full_name: lead.full_name,
+        company: lead.company_name,
+        domain: lead.company_domain,
+      },
+      metadata: { lead_key: leadKey(lead) },
+    };
+  });
   const res = await request(`${BASE}/person/enrich/bulk`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({
-      requests: urls.map((u) => ({
-        params: { profile: u },
-        metadata: { linkedin_url: u },
-      })),
-    }),
+    body: JSON.stringify({ requests }),
   });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
     throw new ProviderError("nymeria", `bulk ${res.statusCode}: ${text}`);
   }
   const json = (await res.body.json()) as NymeriaResponse[];
-  return urls.map((_, i) => json[i]?.data);
+  return leads.map((_, i) => json[i]?.data);
 };
 
 export const nymeriaFinder: EmailFinder = {
   name: "nymeria",
   async findEmails(input: FindEmailsInput): Promise<FindEmailsOutput> {
-    const urls = input.linkedin_urls;
+    const { leads, email_types } = input;
     const persons: Array<NymeriaPerson | undefined> = [];
-    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-      const chunk = urls.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < leads.length; i += BATCH_SIZE) {
+      const chunk = leads.slice(i, i + BATCH_SIZE);
       try {
         const batch = await enrichBulk(chunk);
         persons.push(...batch);
@@ -125,7 +149,17 @@ export const nymeriaFinder: EmailFinder = {
         persons.push(...chunk.map(() => undefined));
       }
     }
-    const results = urls.map((u, i) => personToResult(u, persons[i], input.email_types));
-    return { results, credits_used: urls.length };
+    const results = leads.map((lead, i) =>
+      personToResult(
+        leadKey(lead),
+        lead.kind === "linkedin" ? lead.linkedin_url : "",
+        persons[i],
+        email_types,
+      ),
+    );
+    return {
+      results,
+      credits_used: PROVIDER_CREDITS.nymeria.find * leads.length,
+    };
   },
 };

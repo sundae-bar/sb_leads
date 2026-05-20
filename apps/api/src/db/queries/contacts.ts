@@ -9,6 +9,7 @@ import {
   type ProviderAttempt,
   mergeEmails,
   mergeProviderAttempts,
+  normalizeLinkedinUrl,
 } from '@scoop/types';
 
 /**
@@ -20,11 +21,19 @@ export async function persistContact(
   tenantId: string,
   result: FindEmailResult,
 ): Promise<void> {
+  // Defence in depth: normalise the URL here too. The service already does
+  // it for results going through findEmails, but persistContact is also
+  // callable directly (the402 webhook, future Trigger.dev jobs) and we
+  // never want a non-canonical URL to land in `contacts` — that's the row
+  // the leads UI displays unchanged.
+  const linkedinUrl = normalizeLinkedinUrl(result.linkedin_url);
+  if (!linkedinUrl) return;
+
   const { data: existing } = await adminDb
     .from('contacts')
     .select('emails, providers_attempted, credits_used, person, company')
     .eq('tenant_id', tenantId)
-    .eq('linkedin_url', result.linkedin_url)
+    .eq('linkedin_url', linkedinUrl)
     .maybeSingle();
 
   const merged = existing
@@ -55,7 +64,7 @@ export async function persistContact(
   const { error } = await adminDb.from('contacts').upsert(
     {
       tenant_id: tenantId,
-      linkedin_url: result.linkedin_url,
+      linkedin_url: linkedinUrl,
       ...merged,
       updated_at: new Date().toISOString(),
     },

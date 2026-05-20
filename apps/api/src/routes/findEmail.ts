@@ -12,9 +12,12 @@ findEmailRouter.post('/find-email', requireLeadsAuth, async (req, res, next) => 
   try {
     const body = findEmailRequestSchema.parse(req.body);
     const isBatch = Array.isArray(body.linkedin_urls);
-    const urls = body.linkedin_urls ?? [body.linkedin_url!];
+    const urls = body.linkedin_urls ?? (body.linkedin_url ? [body.linkedin_url] : []);
     const providers =
       body.providers ?? (body.provider ? [body.provider] : undefined);
+
+    // The Zod refinement already guarantees exactly one mode is set.
+    const isNameMode = !urls.length && Boolean(body.full_name);
 
     const guard = await consumeCredits(req.user.tenantId, 1);
     if (!guard.ok) {
@@ -22,20 +25,41 @@ findEmailRouter.post('/find-email', requireLeadsAuth, async (req, res, next) => 
       return;
     }
 
+    // Construct either a URL-mode or name-mode findEmails input. The
+    // service layer normalises both into LeadIdentifier[] internally.
+    const findInput = isNameMode
+      ? {
+          name_queries: [
+            {
+              kind: 'name' as const,
+              full_name: body.full_name!,
+              first_name: body.first_name,
+              last_name: body.last_name,
+              company_domain: body.company_domain,
+              company_name: body.company_name,
+            },
+          ],
+        }
+      : {
+          linkedin_urls: urls,
+          hints:
+            body.hints_by_url ??
+            (body.hints
+              ? Object.fromEntries(urls.map((u) => [u, body.hints]))
+              : undefined),
+        };
+
     const results = await findEmails({
-      linkedin_urls: urls,
+      ...findInput,
       providers: providers as ProviderName[] | undefined,
       waterfall: body.waterfall ?? true,
       email_types: body.email_types ?? ['work', 'personal'],
       verify: body.verify ?? false,
-      hints:
-        body.hints_by_url ??
-        (body.hints ? Object.fromEntries(urls.map((u) => [u, body.hints])) : undefined),
       request_id: randomUUID(),
       tenant_id: req.user.tenantId,
     });
 
-    // Refund the credit when nothing was found across all requested URLs/providers.
+    // Refund the credit when nothing was found.
     const allEmpty = results.every((r) => r.emails.length === 0);
     const creditsRemaining = allEmpty
       ? (await refundCredits(req.user.tenantId, 1)).remaining

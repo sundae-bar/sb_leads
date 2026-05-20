@@ -124,9 +124,29 @@ export async function handleThe402Webhook(req: Request, res: Response): Promise<
     }
 
     const inputs = event.inputs ?? {};
-    const linkedinUrl = inputs.linkedin_url;
-    if (typeof linkedinUrl !== 'string') {
-      throw new Error('inputs.linkedin_url required');
+    const linkedinUrl = typeof inputs.linkedin_url === 'string' ? inputs.linkedin_url : undefined;
+    const fullName = typeof inputs.full_name === 'string' ? inputs.full_name : undefined;
+    const companyDomain =
+      typeof inputs.company_domain === 'string' ? inputs.company_domain : undefined;
+    const companyName =
+      typeof inputs.company_name === 'string' ? inputs.company_name : undefined;
+
+    // Same two-mode validation as the MCP + REST + x402 entry points: one
+    // mode per call. the402 buyers shouldn't be passing both, but if they
+    // do we reject explicitly rather than silently picking one.
+    const isNameMode = !linkedinUrl && Boolean(fullName);
+    if (!linkedinUrl && !fullName) {
+      throw new Error(
+        'inputs.linkedin_url OR inputs.full_name + company_domain/company_name required',
+      );
+    }
+    if (linkedinUrl && fullName) {
+      throw new Error('use either linkedin_url OR name+company, not both');
+    }
+    if (isNameMode && !companyDomain && !companyName) {
+      throw new Error(
+        'name mode requires inputs.company_domain or inputs.company_name',
+      );
     }
 
     const emailTypes = Array.isArray(inputs.email_types)
@@ -135,19 +155,35 @@ export async function handleThe402Webhook(req: Request, res: Response): Promise<
     const verifyEmails = inputs.verify === true;
 
     // Bypass consumeCredits — the402 already collected payment from the caller.
+    const findInput = isNameMode
+      ? {
+          name_queries: [
+            {
+              kind: 'name' as const,
+              full_name: fullName!,
+              first_name:
+                typeof inputs.first_name === 'string' ? inputs.first_name : undefined,
+              last_name:
+                typeof inputs.last_name === 'string' ? inputs.last_name : undefined,
+              company_domain: companyDomain,
+              company_name: companyName,
+            },
+          ],
+        }
+      : { linkedin_urls: [linkedinUrl!] };
+
     const results = await findEmails({
-      linkedin_urls: [linkedinUrl],
+      ...findInput,
       providers: undefined,
       waterfall: true,
       email_types: [...emailTypes],
       verify: verifyEmails,
-      hints: undefined,
       request_id: event.id ?? randomUUID(),
     });
 
     const result = results[0];
     const deliverable = {
-      linkedin_url: result?.linkedin_url ?? linkedinUrl,
+      linkedin_url: result?.linkedin_url ?? linkedinUrl ?? '',
       emails: result?.emails ?? [],
       person: result?.person ?? null,
       company: result?.company ?? null,

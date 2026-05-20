@@ -1,6 +1,7 @@
 import { request } from "undici";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
+import { PROVIDER_CREDITS } from "./credits.js";
 import type {
   EmailFinder,
   FindEmailsInput,
@@ -11,7 +12,7 @@ import type {
   PerUrlFinderResult,
 } from "./types.js";
 import { ProviderError } from "./types.js";
-import type { IntentSignal, NormalizedEmail } from "@scoop/types";
+import { type IntentSignal, type LeadIdentifier, type NormalizedEmail, leadKey } from "@scoop/types";
 
 const BASE = "https://api.apollo.io/api/v1";
 
@@ -44,11 +45,14 @@ const isVerifiedStatus = (status: string | undefined): boolean =>
   status === "verified" || status === "likely_to_engage";
 
 const personToResult = (
-  url: string,
+  leadKeyValue: string,
+  fallbackUrl: string,
   p: ApolloPerson | undefined,
   emailTypes: ReadonlyArray<"work" | "personal">,
 ): PerUrlFinderResult => {
-  if (!p) return { linkedin_url: url, emails: [] };
+  if (!p) {
+    return { lead_key: leadKeyValue, linkedin_url: fallbackUrl, emails: [] };
+  }
   const emails: NormalizedEmail[] = [];
   const wantWork = emailTypes.includes("work");
   const wantPersonal = emailTypes.includes("personal");
@@ -75,7 +79,11 @@ const personToResult = (
     }
   }
   return {
-    linkedin_url: url,
+    lead_key: leadKeyValue,
+    // For name-mode queries we don't have a URL up front; trust Apollo's
+    // response. For URL-mode queries we prefer Apollo's URL too (it may be
+    // a canonical form), falling back to the one we sent in.
+    linkedin_url: p.linkedin_url ?? fallbackUrl,
     emails,
     person: {
       first_name: p.first_name,
@@ -83,7 +91,7 @@ const personToResult = (
       full_name: p.name,
       title: p.title,
       location: [p.city, p.country].filter(Boolean).join(", ") || undefined,
-      linkedin_url: p.linkedin_url ?? url,
+      linkedin_url: p.linkedin_url ?? fallbackUrl,
     },
     company: p.organization
       ? {
@@ -95,9 +103,31 @@ const personToResult = (
   };
 };
 
-const matchOne = async (url: string): Promise<ApolloPerson | undefined> => {
+interface MatchParams {
+  /** URL-mode lookup. */
+  linkedin_url?: string;
+  /** Name-mode lookup — at least one of domain/org_name required alongside the name. */
+  first_name?: string;
+  last_name?: string;
+  name?: string;
+  domain?: string;
+  organization_name?: string;
+}
+
+/**
+ * One call to /people/match. Apollo's docs say this endpoint accepts EITHER
+ * a linkedin_url OR a name+org pair — we pass through whichever we have.
+ */
+const matchOne = async (params: MatchParams): Promise<ApolloPerson | undefined> => {
   const u = new URL(`${BASE}/people/match`);
-  u.searchParams.set("linkedin_url", url);
+  if (params.linkedin_url) u.searchParams.set("linkedin_url", params.linkedin_url);
+  if (params.first_name) u.searchParams.set("first_name", params.first_name);
+  if (params.last_name) u.searchParams.set("last_name", params.last_name);
+  if (params.name) u.searchParams.set("name", params.name);
+  if (params.domain) u.searchParams.set("domain", params.domain);
+  if (params.organization_name) {
+    u.searchParams.set("organization_name", params.organization_name);
+  }
   u.searchParams.set("reveal_personal_emails", "true");
   const res = await request(u, { method: "POST", headers: headers() });
   if (res.statusCode >= 400) {
@@ -108,6 +138,12 @@ const matchOne = async (url: string): Promise<ApolloPerson | undefined> => {
   return json.person;
 };
 
+/**
+ * Bulk match — URL-mode only. Apollo's bulk_match endpoint takes an array
+ * of `{ linkedin_url }` and is much cheaper per call than N single matches.
+ * For name-mode queries we fall back to N sequential matchOne calls (Apollo
+ * doesn't have a bulk name-match endpoint).
+ */
 const matchBulk = async (urls: string[]): Promise<Array<ApolloPerson | undefined>> => {
   const u = new URL(`${BASE}/people/bulk_match`);
   u.searchParams.set("reveal_personal_emails", "true");
@@ -124,36 +160,83 @@ const matchBulk = async (urls: string[]): Promise<Array<ApolloPerson | undefined
   return (json.matches ?? []).map((m) => m ?? undefined);
 };
 
+const matchForLead = async (lead: LeadIdentifier): Promise<ApolloPerson | undefined> => {
+  if (lead.kind === "linkedin") {
+    return matchOne({ linkedin_url: lead.linkedin_url });
+  }
+  return matchOne({
+    name: lead.full_name,
+    first_name: lead.first_name,
+    last_name: lead.last_name,
+    domain: lead.company_domain,
+    organization_name: lead.company_name,
+  });
+};
+
 export const apolloFinder: EmailFinder = {
   name: "apollo",
   async findEmails(input: FindEmailsInput): Promise<FindEmailsOutput> {
-    const urls = input.linkedin_urls;
-    let persons: Array<ApolloPerson | undefined> = [];
-    if (urls.length <= 2) {
-      persons = await Promise.all(
-        urls.map(async (u) => {
+    const { leads, email_types } = input;
+
+    // Partition: URLs can ride the bulk endpoint; name queries can't and
+    // run in parallel through matchOne.
+    const urlLeads = leads.filter((l) => l.kind === "linkedin") as Array<
+      Extract<LeadIdentifier, { kind: "linkedin" }>
+    >;
+    const nameLeads = leads.filter((l) => l.kind === "name");
+
+    const personByKey = new Map<string, ApolloPerson | undefined>();
+
+    // URL leads — use bulk if there are more than two, otherwise individual.
+    if (urlLeads.length > 0) {
+      if (urlLeads.length <= 2) {
+        await Promise.all(
+          urlLeads.map(async (l) => {
+            try {
+              personByKey.set(leadKey(l), await matchOne({ linkedin_url: l.linkedin_url }));
+            } catch (err) {
+              logger.warn({ err, lead: l }, "apollo single URL match failed");
+              personByKey.set(leadKey(l), undefined);
+            }
+          }),
+        );
+      } else {
+        for (let i = 0; i < urlLeads.length; i += 10) {
+          const chunk = urlLeads.slice(i, i + 10);
           try {
-            return await matchOne(u);
+            const matches = await matchBulk(chunk.map((l) => l.linkedin_url));
+            chunk.forEach((l, idx) => personByKey.set(leadKey(l), matches[idx]));
           } catch (err) {
-            logger.warn({ err, url: u }, "apollo single match failed");
-            return undefined;
+            logger.warn({ err, count: chunk.length }, "apollo bulk match failed");
+            for (const l of chunk) personByKey.set(leadKey(l), undefined);
           }
-        }),
-      );
-    } else {
-      for (let i = 0; i < urls.length; i += 10) {
-        const chunk = urls.slice(i, i + 10);
-        try {
-          const matches = await matchBulk(chunk);
-          persons.push(...matches);
-        } catch (err) {
-          logger.warn({ err, chunk }, "apollo bulk match failed");
-          persons.push(...chunk.map(() => undefined));
         }
       }
     }
-    const results = urls.map((u, i) => personToResult(u, persons[i], input.email_types));
-    return { results, credits_used: urls.length };
+
+    // Name leads — sequential matchOne. Apollo's name-mode lookup is rate-
+    // limited more aggressively than URL bulk, so we don't fan them all
+    // out at once. In practice the chat agent calls these one-at-a-time
+    // anyway.
+    for (const l of nameLeads) {
+      try {
+        personByKey.set(leadKey(l), await matchForLead(l));
+      } catch (err) {
+        logger.warn({ err, lead: l }, "apollo name match failed");
+        personByKey.set(leadKey(l), undefined);
+      }
+    }
+
+    const results: PerUrlFinderResult[] = leads.map((l) => {
+      const key = leadKey(l);
+      const fallback = l.kind === "linkedin" ? l.linkedin_url : "";
+      return personToResult(key, fallback, personByKey.get(key), email_types);
+    });
+
+    return {
+      results,
+      credits_used: PROVIDER_CREDITS.apollo.find * leads.length,
+    };
   },
 };
 
@@ -165,10 +248,10 @@ export const apolloIntent: IntentProvider = {
     }
     let person: ApolloPerson | undefined;
     try {
-      person = await matchOne(input.linkedin_url);
+      person = await matchOne({ linkedin_url: input.linkedin_url });
     } catch (err) {
       logger.warn({ err }, "apollo intent match failed");
-      return { company: {}, signals: [], credits_used: 1 };
+      return { company: {}, signals: [], credits_used: PROVIDER_CREDITS.apollo.intent };
     }
     const signals: IntentSignal[] = [];
     if (person?.is_likely_to_engage !== undefined) {
@@ -203,7 +286,7 @@ export const apolloIntent: IntentProvider = {
           }
         : {},
       signals,
-      credits_used: 1,
+      credits_used: PROVIDER_CREDITS.apollo.intent,
     };
   },
 };

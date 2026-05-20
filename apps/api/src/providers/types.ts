@@ -4,17 +4,40 @@ import type {
   EmailType,
   HintsByUrl,
   IntentSignal,
+  LeadIdentifier,
   NormalizedEmail,
   Person,
 } from "@scoop/types";
 
+/**
+ * What providers receive. `leads` is the new canonical input — a mixed list
+ * of URL-mode and name-mode queries. Each provider decides per lead which
+ * upstream endpoint to call based on `lead.kind`.
+ *
+ * Providers index their per-lead results by a stable string key (the URL
+ * for `kind: 'linkedin'`, a `name:<full_name>@<domain|company>` key for
+ * `kind: 'name'`). The service layer reuses the same keying to merge
+ * results across the waterfall — see `leadKey()` in services/findEmail.ts.
+ */
 export interface FindEmailsInput {
-  linkedin_urls: string[];
+  leads: LeadIdentifier[];
   email_types: EmailType[];
   hints?: HintsByUrl;
 }
 
 export interface PerUrlFinderResult {
+  /**
+   * Stable key the service uses to merge this result with other waterfall
+   * hits. For URL-mode this is the input LinkedIn URL; for name-mode it's
+   * the synthesised `name:<full_name>@<domain|company>` key.
+   */
+  lead_key: string;
+  /**
+   * The LinkedIn URL for the resolved person. Always set when the input
+   * was URL-mode. For name-mode it may be empty if the provider didn't
+   * return one — the service falls through to the next provider, and the
+   * final result is shown but NOT persisted (contacts is URL-keyed).
+   */
   linkedin_url: string;
   emails: NormalizedEmail[];
   person?: Person;

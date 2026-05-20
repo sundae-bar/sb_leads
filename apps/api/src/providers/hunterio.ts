@@ -1,5 +1,6 @@
 import { request } from "undici";
 import { config } from "../config.js";
+import { PROVIDER_CREDITS } from "./credits.js";
 import type {
   EmailVerifier,
   IntentInput,
@@ -63,7 +64,7 @@ export const hunterioVerifier: EmailVerifier = {
         webmail: d.webmail,
         accept_all: d.accept_all,
       },
-      credits_used: 1,
+      credits_used: PROVIDER_CREDITS.hunterio.verify,
     };
   },
 };
@@ -127,6 +128,6 @@ export const hunterioIntent: IntentProvider = {
         source_provider: "hunterio",
       });
     }
-    return { company, signals, credits_used: 1 };
+    return { company, signals, credits_used: PROVIDER_CREDITS.hunterio.intent };
   },
 };

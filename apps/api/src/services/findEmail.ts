@@ -5,20 +5,34 @@ import { logger } from "../logger.js";
 import {
   DEFAULT_FINDER_CHAIN,
   DEFAULT_VERIFIER,
+  NAME_MODE_FINDER_CHAIN,
   finders,
   verifiers,
 } from "../providers/registry.js";
 import { HttpError } from "../middleware/error.js";
-import type {
-  EmailType,
-  FindEmailResult,
-  HintsByUrl,
-  NormalizedEmail,
-  ProviderAttempt,
+import {
+  type EmailType,
+  type FindEmailResult,
+  type HintsByUrl,
+  type LeadIdentifier,
+  type NameQuery,
+  type NormalizedEmail,
+  leadKey,
+  normalizeLinkedinUrl,
 } from "@scoop/types";
 
 export interface FindEmailOptions {
-  linkedin_urls: string[];
+  /**
+   * URL-mode queries. Either this OR `name_queries` (or both) must be set.
+   * Optional now that name-mode is supported; callers that pass neither
+   * get a 400 from the entry point validation.
+   */
+  linkedin_urls?: string[];
+  /**
+   * Name-mode queries. `full_name` is required; at least one of
+   * `company_domain` / `company_name` must be set per query.
+   */
+  name_queries?: NameQuery[];
   providers?: ProviderName[];
   waterfall: boolean;
   email_types: EmailType[];
@@ -38,11 +52,24 @@ const hasRequestedTypes = (
   return false;
 };
 
+/**
+ * Pick the waterfall chain based on input mode. URL-mode → the historical
+ * chain (Aleads first, etc.). Name-mode → Apollo-first because its
+ * `/people/match` is the most accurate on name+org. Mixed inputs are rare
+ * in practice (entry points enforce one mode per call) but if they do
+ * occur we fall back to the URL chain since URL is the more conservative
+ * default.
+ */
+const pickChain = (leads: LeadIdentifier[]): ProviderName[] => {
+  const allName = leads.length > 0 && leads.every((l) => l.kind === "name");
+  return allName ? NAME_MODE_FINDER_CHAIN : DEFAULT_FINDER_CHAIN;
+};
+
 const resolveProviderChain = (
   requested: ProviderName[] | undefined,
-  waterfall: boolean,
+  leads: LeadIdentifier[],
 ): ProviderName[] => {
-  const candidates = requested ?? DEFAULT_FINDER_CHAIN;
+  const candidates = requested ?? pickChain(leads);
   const available = candidates.filter((p) => {
     if (!finders[p]) return false;
     if (!isProviderConfigured(p)) {
@@ -54,9 +81,7 @@ const resolveProviderChain = (
   if (available.length === 0) {
     throw new HttpError(400, "no_configured_providers", { requested: candidates });
   }
-  // When waterfall is false and multiple providers requested, we still try them
-  // all and merge — waterfall only affects the early-exit behavior.
-  return waterfall ? available : available;
+  return available;
 };
 
 const verifyEmails = async (
@@ -98,17 +123,50 @@ const verifyEmails = async (
   return { emails: out, credits };
 };
 
+/**
+ * Build the canonical `LeadIdentifier[]` from the two input shapes. We keep
+ * `linkedin_urls` + `name_queries` separate at the public boundary because
+ * the402, REST, and MCP all have them as distinct fields — converting once
+ * here lets every internal codepath work with a single representation.
+ *
+ * URLs are normalised here so the rest of the system (Map keying, provider
+ * inputs, persistence) only ever sees the canonical `https://linkedin.com/…`
+ * form. That dedupes leads across protocol/www/casing variations.
+ */
+const buildLeads = (opts: FindEmailOptions): LeadIdentifier[] => {
+  const urls = opts.linkedin_urls ?? [];
+  const names = opts.name_queries ?? [];
+  const leads: LeadIdentifier[] = [];
+  for (const url of urls) {
+    leads.push({ kind: "linkedin", linkedin_url: normalizeLinkedinUrl(url) });
+  }
+  for (const q of names) leads.push({ ...q, kind: "name" });
+  return leads;
+};
+
 export const findEmails = async (
   opts: FindEmailOptions,
 ): Promise<FindEmailResult[]> => {
-  const chain = resolveProviderChain(opts.providers, opts.waterfall);
+  const leads = buildLeads(opts);
+  if (leads.length === 0) {
+    throw new HttpError(400, "no_leads", {
+      hint: "provide linkedin_urls or name_queries",
+    });
+  }
 
-  // Initialize one result per URL.
-  const merged: Map<string, FindEmailResult> = new Map(
-    opts.linkedin_urls.map((url) => [
-      url,
+  const chain = resolveProviderChain(opts.providers, leads);
+
+  // Initialise one result row per lead, keyed by the stable lead-key.
+  // Insertion order matches input order so we can return in that order at
+  // the end (callers — REST, MCP — rely on positional alignment).
+  const orderedKeys = leads.map(leadKey);
+  const initial: Map<string, FindEmailResult> = new Map(
+    leads.map((lead) => [
+      leadKey(lead),
       {
-        linkedin_url: url,
+        // For URL leads we know the URL up front. For name leads it stays
+        // empty until a provider returns one — see PerUrlFinderResult.linkedin_url.
+        linkedin_url: lead.kind === "linkedin" ? lead.linkedin_url : "",
         emails: [],
         providers_attempted: [],
         credits_used: 0,
@@ -118,31 +176,33 @@ export const findEmails = async (
 
   for (const providerName of chain) {
     const provider = finders[providerName]!;
-    const remainingUrls = opts.waterfall
-      ? Array.from(merged.values())
-          .filter((r) => !hasRequestedTypes(r.emails, opts.email_types))
-          .map((r) => r.linkedin_url)
-      : opts.linkedin_urls;
+    // Decide which leads still need work this round. In waterfall mode, skip
+    // any lead that already has every requested email type.
+    const remainingLeads = opts.waterfall
+      ? leads.filter((lead) => {
+          const r = initial.get(leadKey(lead))!;
+          return !hasRequestedTypes(r.emails, opts.email_types);
+        })
+      : leads;
 
-    if (remainingUrls.length === 0) break;
+    if (remainingLeads.length === 0) break;
 
     let output: Awaited<ReturnType<typeof provider.findEmails>>;
     try {
       output = await provider.findEmails({
-        linkedin_urls: remainingUrls,
+        leads: remainingLeads,
         email_types: opts.email_types,
         hints: opts.hints,
       });
     } catch (err) {
       logger.warn({ err, provider: providerName }, "provider failed");
-      for (const url of remainingUrls) {
-        const r = merged.get(url)!;
-        const attempt: ProviderAttempt = {
+      for (const lead of remainingLeads) {
+        const r = initial.get(leadKey(lead))!;
+        r.providers_attempted.push({
           provider: providerName,
           found: false,
           error: err instanceof Error ? err.message : String(err),
-        };
-        r.providers_attempted.push(attempt);
+        });
       }
       continue;
     }
@@ -153,40 +213,58 @@ export const findEmails = async (
       amount: output.credits_used,
       request_id: opts.request_id,
       tenant: opts.tenant_id,
-      meta: { urls: remainingUrls.length },
+      meta: { leads: remainingLeads.length },
     });
 
-    for (const perUrl of output.results) {
-      const r = merged.get(perUrl.linkedin_url)!;
+    for (const perLead of output.results) {
+      // Providers index their results by the same `lead_key` we sent — see
+      // PerUrlFinderResult. If a stub or buggy provider returns a key we
+      // don't recognise, skip it rather than crash.
+      const r = initial.get(perLead.lead_key);
+      if (!r) {
+        logger.warn(
+          { provider: providerName, key: perLead.lead_key },
+          "provider returned unknown lead_key",
+        );
+        continue;
+      }
       r.credits_used += output.credits_used / output.results.length || 0;
       r.providers_attempted.push({
         provider: providerName,
-        found: perUrl.emails.length > 0,
+        found: perLead.emails.length > 0,
         error: null,
       });
-      // Merge: only add emails for types we don't yet have if waterfall.
+      // Waterfall mode: only add emails for types we don't yet have.
       const existingTypes = new Set(r.emails.map((e) => e.type));
       const filtered = opts.waterfall
-        ? perUrl.emails.filter((e) => !existingTypes.has(e.type))
-        : perUrl.emails;
+        ? perLead.emails.filter((e) => !existingTypes.has(e.type))
+        : perLead.emails;
       r.emails.push(...filtered);
-      r.person = r.person ?? perUrl.person;
-      r.company = r.company ?? perUrl.company;
+      r.person = r.person ?? perLead.person;
+      r.company = r.company ?? perLead.company;
+      // Fill in linkedin_url from the provider if we didn't have one (name
+      // mode). Once set, don't overwrite — first provider to know wins.
+      // Normalise on the way in: providers return URLs in various shapes
+      // (http://, www., trailing /, country subdomains) and we want a
+      // single canonical form across the contacts table + leads view.
+      if (!r.linkedin_url && perLead.linkedin_url) {
+        r.linkedin_url = normalizeLinkedinUrl(perLead.linkedin_url);
+      }
     }
   }
 
-  // Round credits to integers (we apportioned; sum should match real total via logCredit).
-  for (const r of merged.values()) {
+  // Round apportioned credits to integers.
+  for (const r of initial.values()) {
     r.credits_used = Math.round(r.credits_used);
   }
 
   if (opts.verify) {
-    for (const r of merged.values()) {
+    for (const r of initial.values()) {
       const { emails, credits } = await verifyEmails(r.emails, opts.request_id);
       r.emails = emails;
       r.credits_used += credits;
     }
   }
 
-  return opts.linkedin_urls.map((u) => merged.get(u)!);
+  return orderedKeys.map((k) => initial.get(k)!);
 };

@@ -42,10 +42,22 @@ export const registerTools = (server: McpServer, auth: McpAuthContext): void => 
     {
       title: "Find email",
       description:
-        "Find work and/or personal emails for a LinkedIn profile across configured providers. Supports waterfall fallback and inline verification. Charges 1 credit per call; refunded automatically if no emails are returned.",
+        "Find work and/or personal emails across configured providers. Two input modes:\n" +
+        "  1. URL mode — pass `linkedin_url` (or `linkedin_urls` for batch).\n" +
+        "  2. Name+company mode — pass `full_name` AND one of `company_domain` / `company_name`.\n" +
+        "URL mode is preferred when available (more accurate). For name mode, prefer a domain ('cykel.ai') over a free-text name ('Cykel') — most providers match much better against a domain.\n" +
+        "Supports waterfall fallback (default) and inline Hunter.io verification. Charges 1 credit per call; refunded automatically if no emails are returned.",
       inputSchema: {
+        // URL mode
         linkedin_url: z.string().url().optional(),
         linkedin_urls: z.array(z.string().url()).optional(),
+        // Name+company mode
+        full_name: z.string().optional(),
+        first_name: z.string().optional(),
+        last_name: z.string().optional(),
+        company_domain: z.string().optional(),
+        company_name: z.string().optional(),
+        // Common
         providers: z.array(providerEnum).optional(),
         waterfall: z.boolean().default(true),
         email_types: z.array(z.enum(["work", "personal"])).default(["work", "personal"]),
@@ -55,8 +67,26 @@ export const registerTools = (server: McpServer, auth: McpAuthContext): void => 
     },
     async (args) => {
       const urls = args.linkedin_urls ?? (args.linkedin_url ? [args.linkedin_url] : []);
-      if (urls.length === 0) {
-        return errorContent("linkedin_url or linkedin_urls required");
+      const hasName = Boolean(args.full_name);
+      const hasCompany = Boolean(args.company_domain || args.company_name);
+
+      // Validate input mode. We accept ONE mode per call — mixing URL +
+      // name in the same call is intentionally rejected to keep the
+      // waterfall semantics simple (each chain is mode-specific).
+      if (urls.length === 0 && !hasName) {
+        return errorContent(
+          "provide either linkedin_url(s) or full_name + company_domain/company_name",
+        );
+      }
+      if (urls.length > 0 && hasName) {
+        return errorContent(
+          "use either linkedin_url(s) OR name+company in a single call, not both",
+        );
+      }
+      if (hasName && !hasCompany) {
+        return errorContent(
+          "name mode requires company_domain or company_name (prefer a domain — providers match better)",
+        );
       }
 
       const guard = await consumeCredits(auth.tenantId, 1);
@@ -64,15 +94,34 @@ export const registerTools = (server: McpServer, auth: McpAuthContext): void => 
         return errorContent("out_of_credits");
       }
 
+      // Build the canonical findEmails input. Either urls XOR name_queries
+      // is set — the service layer handles either path.
+      const findInput = urls.length > 0
+        ? {
+            linkedin_urls: urls,
+            hints: args.hints
+              ? Object.fromEntries(urls.map((u) => [u, args.hints]))
+              : undefined,
+          }
+        : {
+            name_queries: [
+              {
+                kind: "name" as const,
+                full_name: args.full_name!,
+                first_name: args.first_name,
+                last_name: args.last_name,
+                company_domain: args.company_domain,
+                company_name: args.company_name,
+              },
+            ],
+          };
+
       const results = await findEmails({
-        linkedin_urls: urls,
+        ...findInput,
         providers: args.providers as ProviderName[] | undefined,
         waterfall: args.waterfall ?? true,
         email_types: args.email_types ?? ["work", "personal"],
         verify: args.verify ?? false,
-        hints: args.hints
-          ? Object.fromEntries(urls.map((u) => [u, args.hints]))
-          : undefined,
         request_id: randomUUID(),
         tenant_id: auth.tenantId,
       });
@@ -83,10 +132,17 @@ export const registerTools = (server: McpServer, auth: McpAuthContext): void => 
         await refundCredits(auth.tenantId, 1);
       }
 
-      // Persist every result (even empty ones) so list_contacts surfaces the
-      // attempt, matching the dashboard flow. Persistence failures shouldn't
-      // bubble up to the agent — log and continue.
+      // Persist results so list_contacts surfaces them. Skip rows without
+      // a LinkedIn URL — `contacts` is keyed by `(tenant_id, linkedin_url)`
+      // and we don't synthesise URLs for name-mode lookups that didn't
+      // produce one (rare, but possible when no provider returned a
+      // canonical URL). Those still appear in the agent's reply, just not
+      // in the saved contacts table.
+      //
+      // NOTE: we persist *before* normalising credits_used below, so the
+      // contacts table keeps the real per-provider cost for analytics.
       for (const r of results) {
+        if (!r.linkedin_url) continue;
         try {
           await persistContact(auth.tenantId, r);
         } catch (err) {
@@ -94,15 +150,18 @@ export const registerTools = (server: McpServer, auth: McpAuthContext): void => 
         }
       }
 
+      // Overwrite `credits_used` with the actual tenant billing cost before
+      // returning to the model — tenant billing is flat 1-per-call regardless
+      // of underlying provider cost. See the long comment in earlier loops.
+      const tenantCredit = allEmpty ? 0 : 1;
+      for (const r of results) {
+        r.credits_used = tenantCredit;
+      }
+
       const isBatch = Array.isArray(args.linkedin_urls);
       return text(
         isBatch
-          ? {
-              results,
-              credits_used: allEmpty
-                ? 0
-                : results.reduce((acc, r) => acc + r.credits_used, 0),
-            }
+          ? { results, credits_used: tenantCredit }
           : results[0],
       );
     },

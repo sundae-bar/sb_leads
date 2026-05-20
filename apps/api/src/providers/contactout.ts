@@ -1,6 +1,7 @@
 import { request } from "undici";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
+import { PROVIDER_CREDITS } from "./credits.js";
 import type {
   EmailFinder,
   FindEmailsInput,
@@ -8,7 +9,7 @@ import type {
   PerUrlFinderResult,
 } from "./types.js";
 import { ProviderError } from "./types.js";
-import type { NormalizedEmail } from "@scoop/types";
+import { type LeadIdentifier, type NormalizedEmail, leadKey } from "@scoop/types";
 
 const BASE = "https://api.contactout.com/v1";
 
@@ -32,7 +33,10 @@ const headers = (): Record<string, string> => ({
   token: config.providers.contactout,
 });
 
-const fetchSingle = async (url: string): Promise<ContactoutSingleProfile | undefined> => {
+/** URL-mode lookup. */
+const fetchByUrl = async (
+  url: string,
+): Promise<ContactoutSingleProfile | undefined> => {
   const u = new URL(`${BASE}/people/linkedin`);
   u.searchParams.set("profile", url);
   u.searchParams.set("include_phone", "false");
@@ -45,12 +49,55 @@ const fetchSingle = async (url: string): Promise<ContactoutSingleProfile | undef
   return json.profile;
 };
 
+/**
+ * Name-mode lookup via ContactOut's email-finder endpoint. Requires at
+ * least first_name + last_name + domain. If only a company name is given
+ * (no domain) we fail upstream — domain is mandatory for ContactOut.
+ */
+const fetchByName = async (
+  firstName: string | undefined,
+  lastName: string | undefined,
+  domain: string | undefined,
+): Promise<ContactoutSingleProfile | undefined> => {
+  if (!firstName || !lastName || !domain) return undefined;
+  const u = new URL(`${BASE}/email_finder`);
+  u.searchParams.set("first_name", firstName);
+  u.searchParams.set("last_name", lastName);
+  u.searchParams.set("domain", domain);
+  const res = await request(u, { method: "GET", headers: headers() });
+  if (res.statusCode >= 400) {
+    const text = await res.body.text();
+    throw new ProviderError("contactout", `email_finder ${res.statusCode}: ${text}`);
+  }
+  const json = (await res.body.json()) as { profile?: ContactoutSingleProfile };
+  return json.profile;
+};
+
+const splitName = (full: string): { first?: string; last?: string } => {
+  const parts = full.trim().split(/\s+/);
+  if (parts.length < 2) return { first: parts[0], last: undefined };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+};
+
+const fetchForLead = async (
+  lead: LeadIdentifier,
+): Promise<ContactoutSingleProfile | undefined> => {
+  if (lead.kind === "linkedin") return fetchByUrl(lead.linkedin_url);
+  const split = splitName(lead.full_name);
+  return fetchByName(
+    lead.first_name ?? split.first,
+    lead.last_name ?? split.last,
+    lead.company_domain,
+  );
+};
+
 const profileToResult = (
-  url: string,
+  key: string,
+  fallbackUrl: string,
   p: ContactoutSingleProfile | undefined,
   emailTypes: ReadonlyArray<"work" | "personal">,
 ): PerUrlFinderResult => {
-  if (!p) return { linkedin_url: url, emails: [] };
+  if (!p) return { lead_key: key, linkedin_url: fallbackUrl, emails: [] };
   const emails: NormalizedEmail[] = [];
   if (emailTypes.includes("work")) {
     const statuses = p.work_email_status ?? [];
@@ -77,7 +124,8 @@ const profileToResult = (
     }
   }
   return {
-    linkedin_url: url,
+    lead_key: key,
+    linkedin_url: p.url ?? fallbackUrl,
     emails,
     person: {
       first_name: p.first_name,
@@ -85,7 +133,7 @@ const profileToResult = (
       full_name: p.full_name,
       title: p.title,
       location: p.location,
-      linkedin_url: p.url ?? url,
+      linkedin_url: p.url ?? fallbackUrl,
     },
     company: p.company,
   };
@@ -94,18 +142,28 @@ const profileToResult = (
 export const contactoutFinder: EmailFinder = {
   name: "contactout",
   async findEmails(input: FindEmailsInput): Promise<FindEmailsOutput> {
-    const urls = input.linkedin_urls;
+    const { leads, email_types } = input;
     const profiles = await Promise.all(
-      urls.map(async (u) => {
+      leads.map(async (lead) => {
         try {
-          return await fetchSingle(u);
+          return await fetchForLead(lead);
         } catch (err) {
-          logger.warn({ err, url: u }, "contactout fetch failed");
+          logger.warn({ err, lead }, "contactout fetch failed");
           return undefined;
         }
       }),
     );
-    const results = urls.map((u, i) => profileToResult(u, profiles[i], input.email_types));
-    return { results, credits_used: urls.length };
+    const results = leads.map((lead, i) =>
+      profileToResult(
+        leadKey(lead),
+        lead.kind === "linkedin" ? lead.linkedin_url : "",
+        profiles[i],
+        email_types,
+      ),
+    );
+    return {
+      results,
+      credits_used: PROVIDER_CREDITS.contactout.find * leads.length,
+    };
   },
 };

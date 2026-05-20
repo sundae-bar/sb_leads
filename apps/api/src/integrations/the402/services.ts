@@ -48,17 +48,35 @@ export const LISTED_SERVICES: readonly The402Service[] = [
     price: { fixed: '$0.25' },
     fulfillment_type: 'instant',
     description:
-      "Find verified work and/or personal emails for a LinkedIn profile across multiple data providers (Aleads, Apollo, Nymeria, ContactOut). Waterfall fallback with optional Hunter.io verification. Returns deliverability-graded results in under 5 seconds.",
+      "Find verified work and/or personal emails across multiple data providers (Aleads, Apollo, Nymeria, ContactOut). Two input modes: (1) by LinkedIn URL, or (2) by full name + company domain (or company name). Waterfall fallback with optional Hunter.io verification. Returns deliverability-graded results in under 5 seconds.",
     input_schema: {
       type: 'object',
-      required: ['linkedin_url'],
+      description:
+        'Provide EITHER linkedin_url OR full_name plus one of company_domain / company_name. Mixing both modes in one call is rejected.',
       additionalProperties: false,
       properties: {
         linkedin_url: {
           type: 'string',
           format: 'uri',
           description:
-            'Full LinkedIn profile URL, e.g. https://www.linkedin.com/in/williamhgates/',
+            'Full LinkedIn profile URL, e.g. https://www.linkedin.com/in/williamhgates/. URL mode is the most accurate when available.',
+        },
+        full_name: {
+          type: 'string',
+          description:
+            "Person's full name, e.g. 'Aran McKenna'. Use when no LinkedIn URL is available. Requires company_domain or company_name.",
+        },
+        first_name: { type: 'string', description: 'Optional — refines name-mode matching.' },
+        last_name: { type: 'string', description: 'Optional — refines name-mode matching.' },
+        company_domain: {
+          type: 'string',
+          description:
+            "Company website domain, e.g. 'cykel.ai'. Strongly preferred over company_name when available — providers match much better against a domain.",
+        },
+        company_name: {
+          type: 'string',
+          description:
+            "Free-text company name, e.g. 'Cykel'. Used when no domain is known; some providers will resolve it themselves.",
         },
         email_types: {
           type: 'array',

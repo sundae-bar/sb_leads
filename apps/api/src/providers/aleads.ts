@@ -11,7 +11,14 @@ import type {
   PerUrlFinderResult,
 } from "./types.js";
 import { ProviderError } from "./types.js";
-import type { FindEmailHints, IntentSignal, NormalizedEmail } from "@scoop/types";
+import { PROVIDER_CREDITS } from "./credits.js";
+import {
+  type FindEmailHints,
+  type IntentSignal,
+  type LeadIdentifier,
+  type NormalizedEmail,
+  leadKey,
+} from "@scoop/types";
 
 const BASE = "https://api.a-leads.co/gateway/v1";
 const PLACEHOLDER_EMAIL_RE = /email_not_unlocked@/i;
@@ -43,18 +50,17 @@ const linkedinUsernameFromUrl = (url: string): string => {
   return m?.[1] ?? "";
 };
 
-const searchByLinkedinUsername = async (
-  username: string,
+const advancedSearch = async (
+  filters: Record<string, unknown>,
 ): Promise<AleadsContact | null> => {
-  const body = {
-    advanced_filters: { linkedin_username: [username] },
-    current_page: 0,
-    search_type: "total",
-  };
   const res = await request(`${BASE}/search/advanced-search`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      advanced_filters: filters,
+      current_page: 0,
+      search_type: "total",
+    }),
   });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
@@ -64,6 +70,26 @@ const searchByLinkedinUsername = async (
     data?: { results?: AleadsContact[] };
   };
   return json.data?.results?.[0] ?? null;
+};
+
+const searchByLinkedinUsername = (username: string) =>
+  advancedSearch({ linkedin_username: [username] });
+
+/**
+ * Name-mode search. Aleads' advanced-search accepts free-text filters on
+ * name and company; we hand it the full_name and either the domain or the
+ * company name. If both name and domain match a record, Aleads returns the
+ * contact + document_id we need for the subsequent email unlock.
+ */
+const searchByName = (
+  fullName: string,
+  domain: string | undefined,
+  companyName: string | undefined,
+) => {
+  const filters: Record<string, unknown> = { name: [fullName] };
+  if (domain) filters.domain = [domain];
+  else if (companyName) filters.company_name = [companyName];
+  return advancedSearch(filters);
 };
 
 const unlockEmail = async (
@@ -103,29 +129,76 @@ const unlockEmail = async (
   return email;
 };
 
+/**
+ * Resolve a contact for one lead — either by LinkedIn username (URL mode)
+ * or by name + domain/company (name mode). Returns the raw AleadsContact +
+ * the per-step credits used so the caller can attribute them.
+ */
+const searchForLead = async (
+  lead: LeadIdentifier,
+): Promise<{ contact: AleadsContact | null; searchCredits: number }> => {
+  if (lead.kind === "linkedin") {
+    const username = linkedinUsernameFromUrl(lead.linkedin_url);
+    if (!username) return { contact: null, searchCredits: 0 };
+    const contact = await searchByLinkedinUsername(username);
+    return { contact, searchCredits: PROVIDER_CREDITS.aleads.search };
+  }
+  const contact = await searchByName(
+    lead.full_name,
+    lead.company_domain,
+    lead.company_name,
+  );
+  return { contact, searchCredits: PROVIDER_CREDITS.aleads.search };
+};
+
+/**
+ * Merge upstream contact data with the caller's hints so unlockEmail() has
+ * the strongest possible signal. For name-mode queries the lead itself
+ * carries the name + domain we need; URL-mode pulls them from the contact
+ * record. Either way, hints (if provided) win over both.
+ */
+const hintsForLead = (
+  lead: LeadIdentifier,
+  contact: AleadsContact,
+  upstreamHints: FindEmailHints | undefined,
+): FindEmailHints => {
+  const base: FindEmailHints = lead.kind === "name"
+    ? {
+        first_name: lead.first_name,
+        last_name: lead.last_name,
+        full_name: lead.full_name,
+        company_domain: lead.company_domain,
+        company_name: lead.company_name,
+      }
+    : {};
+  return { ...base, ...upstreamHints, document_id: contact.document_id ?? upstreamHints?.document_id };
+};
+
 const findOne = async (
-  url: string,
+  lead: LeadIdentifier,
   emailTypes: ReadonlyArray<"work" | "personal">,
-  hints?: FindEmailHints,
+  upstreamHints?: FindEmailHints,
 ): Promise<{ result: PerUrlFinderResult; credits: number }> => {
-  const username = linkedinUsernameFromUrl(url);
-  if (!username) {
+  const fallbackUrl = lead.kind === "linkedin" ? lead.linkedin_url : "";
+  const key = leadKey(lead);
+
+  let credits = 0;
+  const { contact, searchCredits } = await searchForLead(lead);
+  credits += searchCredits;
+
+  if (!contact) {
     return {
-      result: { linkedin_url: url, emails: [] },
-      credits: 0,
+      result: { lead_key: key, linkedin_url: fallbackUrl, emails: [] },
+      credits,
     };
   }
-  let credits = 0;
-  const contact = await searchByLinkedinUsername(username);
-  credits += 1;
-  if (!contact) {
-    return { result: { linkedin_url: url, emails: [] }, credits };
-  }
+
+  const hints = hintsForLead(lead, contact, upstreamHints);
   const emails: NormalizedEmail[] = [];
   for (const type of emailTypes) {
     try {
       const email = await unlockEmail(contact, hints, type);
-      credits += 1;
+      credits += PROVIDER_CREDITS.aleads.find;
       if (email) {
         emails.push({
           address: email,
@@ -137,12 +210,14 @@ const findOne = async (
         });
       }
     } catch (err) {
-      logger.warn({ err, url, type }, "aleads unlock failed");
+      logger.warn({ err, lead, type }, "aleads unlock failed");
     }
   }
+
   return {
     result: {
-      linkedin_url: url,
+      lead_key: key,
+      linkedin_url: contact.member_linkedin_url ?? fallbackUrl,
       emails,
       person: {
         first_name: contact.member_first_name,
@@ -150,7 +225,7 @@ const findOne = async (
         full_name: contact.member_full_name,
         title: contact.job_title,
         location: contact.member_location_raw_address,
-        linkedin_url: contact.member_linkedin_url ?? url,
+        linkedin_url: contact.member_linkedin_url ?? fallbackUrl,
       },
       company: {
         name: contact.company_name,
@@ -167,9 +242,12 @@ export const aleadsFinder: EmailFinder = {
   async findEmails(input: FindEmailsInput): Promise<FindEmailsOutput> {
     const out: PerUrlFinderResult[] = [];
     let credits = 0;
-    for (const url of input.linkedin_urls) {
-      const hints = input.hints?.[url];
-      const { result, credits: c } = await findOne(url, input.email_types, hints);
+    for (const lead of input.leads) {
+      // Hints keyed by URL only make sense for URL-mode leads. Name-mode
+      // queries carry their own context on the LeadIdentifier itself.
+      const hints =
+        lead.kind === "linkedin" ? input.hints?.[lead.linkedin_url] : undefined;
+      const { result, credits: c } = await findOne(lead, input.email_types, hints);
       credits += c;
       out.push(result);
     }
@@ -238,7 +316,7 @@ export const aleadsIntent: IntentProvider = {
         industry: co?.industry,
       },
       signals,
-      credits_used: 1,
+      credits_used: PROVIDER_CREDITS.aleads.intent,
     };
   },
 };
