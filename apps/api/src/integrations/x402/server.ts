@@ -8,6 +8,7 @@ import { paymentMiddleware } from '@x402/express';
 import { HTTPFacilitatorClient, x402ResourceServer } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 import { createFacilitatorConfig } from '@coinbase/x402';
+import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
 import type { Network } from '@x402/core/types';
 
 // NOTE on refund-on-empty: `exact` is all-or-nothing — facilitator rejects
@@ -48,6 +49,87 @@ const server = new x402ResourceServer(facilitator).register(
   new ExactEvmScheme(),
 );
 
+// Bazaar discovery extension.
+//
+// Coinbase's CDP Bazaar (https://docs.cdp.coinbase.com/x402/bazaar) indexes
+// our endpoint only when the extension on our 402 response carries `info`
+// (a worked example of what the endpoint accepts + returns) AND `schema`
+// (a JSON Schema that strictly validates `info.input`). The older config
+// shape we used (`{ discoverable, category, tags }`) is rejected silently
+// by the facilitator's validator — visible only via the `EXTENSION-RESPONSES`
+// header — which kept us out of the catalog despite serving payments.
+//
+// `declareDiscoveryExtension()` builds the proper `{ bazaar: { info, schema } }`
+// payload from a friendlier config object. The `method` field is omitted on
+// purpose — the middleware fills it from the route key ("POST /...").
+const findEmailDiscovery = declareDiscoveryExtension({
+  bodyType: 'json',
+  // Example input shown in the Bazaar listing. URL mode is the canonical
+  // path most buyers will use; the schema documents the name+company
+  // alternative too. Keep this input minimal — only fields the example
+  // exercises — so it cleanly passes its own schema.
+  input: {
+    linkedin_url: 'https://www.linkedin.com/in/satyanadella/',
+  },
+  inputSchema: {
+    type: 'object',
+    properties: {
+      linkedin_url: {
+        type: 'string',
+        format: 'uri',
+        description:
+          'Full LinkedIn profile URL — most accurate input mode when available.',
+      },
+      full_name: {
+        type: 'string',
+        description:
+          "Person's full name. Alternative to linkedin_url; requires company_domain (preferred) or company_name.",
+      },
+      first_name: { type: 'string' },
+      last_name: { type: 'string' },
+      company_domain: {
+        type: 'string',
+        description:
+          "Company website domain, e.g. 'microsoft.com'. Use with full_name when no LinkedIn URL is available.",
+      },
+      company_name: {
+        type: 'string',
+        description:
+          'Company name fallback when no domain is known.',
+      },
+      email_types: {
+        type: 'array',
+        items: { type: 'string', enum: ['work', 'personal'] },
+        default: ['work', 'personal'],
+      },
+      verify: {
+        type: 'boolean',
+        description:
+          'When true, runs Hunter.io deliverability verification on each email.',
+        default: false,
+      },
+    },
+  },
+  output: {
+    example: {
+      linkedin_url: 'https://linkedin.com/in/satyanadella',
+      emails: [
+        {
+          address: 'satya@microsoft.com',
+          type: 'work',
+          verified: true,
+          source_provider: 'apollo',
+        },
+      ],
+      person: { full_name: 'Satya Nadella', title: 'CEO' },
+      company: { name: 'Microsoft', domain: 'microsoft.com' },
+      providers_attempted: [
+        { provider: 'apollo', found: true, error: null },
+      ],
+    },
+  },
+});
+
 export const x402Middleware = paymentMiddleware(
   {
     'POST /x402/find-email': {
@@ -64,15 +146,7 @@ export const x402Middleware = paymentMiddleware(
       mimeType: 'application/json',
       // Only declare Bazaar discoverability on mainnet — Coinbase's crawler
       // ignores testnet endpoints, and we don't want noise in the dev catalog.
-      extensions: DISCOVERABLE
-        ? {
-            bazaar: {
-              discoverable: true,
-              category: 'data',
-              tags: ['email', 'linkedin', 'enrichment', 'b2b', 'sales-intelligence'],
-            },
-          }
-        : undefined,
+      extensions: DISCOVERABLE ? findEmailDiscovery : undefined,
     },
   },
   server,
