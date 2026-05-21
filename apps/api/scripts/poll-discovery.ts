@@ -16,7 +16,12 @@
 import 'dotenv/config';
 import { createAuthHeader } from '@coinbase/x402';
 
-const SCOOP_NEEDLE = 'scoop-api-production';
+// We look for any resource URL containing 'sundaebar' so the poller catches
+// both the new canonical entry (api.scoop.sundaebar.ai) and any future
+// sundaebar-hosted endpoints. The old Railway-domain entry (if it
+// still exists in the catalog) won't match — it shouldn't, since we've
+// moved off that URL and want metrics to roll over to the new entry.
+const SCOOP_NEEDLE = 'sundaebar';
 const BAZAAR_HOST = 'https://api.cdp.coinbase.com';
 const BAZAAR_PATH = '/platform/v2/x402/discovery/resources';
 const AGENTIC_URL = 'https://api.agentic.market/v1/services/search?q=scoop';

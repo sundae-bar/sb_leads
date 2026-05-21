@@ -86,13 +86,16 @@ const PRICE = process.env.X402_FIND_EMAIL_PRICE ?? '$0.25';
 const DISCOVERABLE = process.env.X402_DISCOVERABLE === 'true'; // mainnet-only flag
 // Canonical public URL of the protected resource. Drives both the `resource`
 // field in the 402 payload (what Bazaar catalogs as our endpoint URL) and
-// the paymentPayload.resource the client signs against. Without an explicit
-// value the middleware infers it from req.protocol/host — which on Railway
-// gives us http:// despite `trust proxy` (depending on header chain), and
-// http URLs may be silently rejected by Bazaar's validator.
+// the paymentPayload.resource the client signs against.
+//
+// We pin this to a domain we own (api.scoop.sundaebar.ai) rather than
+// Railway's auto-generated host. Bazaar keys catalog entries by full URL,
+// so moving infra later (Fly, Vercel, AWS) would orphan our listing if the
+// URL embedded Railway's host. The custom domain is permanent — the
+// catalog entry is permanent.
 const RESOURCE_URL =
   process.env.X402_RESOURCE_URL ??
-  'https://scoop-api-production.up.railway.app/x402/find-email';
+  'https://api.scoop.sundaebar.ai/x402/find-email';
 
 if (!PAY_TO) {
   throw new Error(

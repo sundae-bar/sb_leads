@@ -52,7 +52,7 @@ import { base } from 'viem/chains';
 
 const ENDPOINT =
   process.env.X402_MAINNET_ENDPOINT ??
-  'https://scoop-api-production.up.railway.app/x402/find-email';
+  'https://api.scoop.sundaebar.ai/x402/find-email';
 const LINKEDIN =
   process.env.X402_TEST_LINKEDIN ?? 'https://www.linkedin.com/in/satyanadella/';
 
