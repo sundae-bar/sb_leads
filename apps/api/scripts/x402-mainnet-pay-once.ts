@@ -124,7 +124,68 @@ async function main() {
     'eip155:8453',
     new ExactEvmScheme(signer),
   );
-  const paidFetch = wrapFetchWithPayment(fetch, x402);
+
+  // Wrap fetch with a logger that surfaces every interesting x402 header on
+  // every hop. Without this the wrapper hides the 402-then-200 dance and we
+  // never see whether Bazaar's validator accepted the extension. We
+  // specifically watch for:
+  //   payment-required    — 402 quote from our server (1st hop)
+  //   payment-response    — settle result from CDP (2nd hop, on success)
+  //   extension-responses — Bazaar's verdict on each declared extension
+  //                         (the smoking gun: rejected = invisible to catalog)
+  const bazaarVerdict = { seen: false, accepted: false, raw: '' };
+  const loggingFetch: typeof fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    const method = init?.method ?? 'GET';
+    console.log(`\n  → ${method} ${url}`);
+    const reqHeaders = new Headers(init?.headers);
+    const sigHeader = reqHeaders.get('payment-signature');
+    if (sigHeader) {
+      console.log(
+        `    payment-signature: ${sigHeader.slice(0, 60)}… (${sigHeader.length} chars total)`,
+      );
+    }
+
+    const res = await fetch(input, init);
+    console.log(`  ← HTTP ${res.status} ${res.statusText}`);
+
+    for (const headerName of [
+      'payment-required',
+      'payment-response',
+      'extension-responses',
+    ] as const) {
+      const value = res.headers.get(headerName);
+      if (!value) continue;
+      const decoded = tryDecodeBase64Json(value);
+      console.log(`    ${headerName}:`);
+      if (decoded !== null && typeof decoded === 'object') {
+        const pretty = JSON.stringify(decoded, null, 2)
+          .split('\n')
+          .map((l) => '      ' + l)
+          .join('\n');
+        console.log(pretty);
+      } else {
+        console.log(
+          `      ${value.length > 200 ? value.slice(0, 200) + '…' : value}`,
+        );
+      }
+
+      // Snapshot Bazaar's verdict — what we actually care about. Header
+      // shape is `{ <extension-name>: { status: "accepted" | "rejected", ... } }`
+      // or a list of those. We just look for the bazaar key.
+      if (headerName === 'extension-responses' && decoded && typeof decoded === 'object') {
+        const bazaarEntry = extractBazaarEntry(decoded);
+        if (bazaarEntry) {
+          bazaarVerdict.seen = true;
+          bazaarVerdict.raw = JSON.stringify(bazaarEntry);
+          bazaarVerdict.accepted =
+            (bazaarEntry as { status?: string }).status === 'accepted';
+        }
+      }
+    }
+    return res;
+  };
+  const paidFetch = wrapFetchWithPayment(loggingFetch, x402);
 
   // 4. The actual call. `paidFetch` does the 402 retry internally:
   //    - first request returns 402 + payment requirements,
@@ -148,7 +209,7 @@ async function main() {
   }
   const elapsed = Date.now() - t0;
 
-  console.log(`\n[4] Response: HTTP ${res.status} (${elapsed}ms)`);
+  console.log(`\n[4] Final response: HTTP ${res.status} (${elapsed}ms total)`);
   const body = await res.text();
   let parsed: unknown;
   try {
@@ -160,18 +221,70 @@ async function main() {
   console.log(typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2));
 
   // 5. Print the post-payment balance so the user can see the deduction.
+  // Sleep briefly so the public RPC node has time to pick up the new block.
+  await new Promise((r) => setTimeout(r, 4000));
   const balanceAfter = (await usdc.read.balanceOf([account.address])) as bigint;
   console.log(
     `\n[5] USDC balance after settle: ${formatUnits(balanceAfter, 6)} USDC ` +
       `(spent ${formatUnits(balance - balanceAfter, 6)})`,
   );
 
+  // 6. Crisp pass/fail summary — what actually matters is Bazaar's verdict.
+  console.log('\n[6] Bazaar indexation verdict:');
+  if (!bazaarVerdict.seen) {
+    console.log(
+      `    ⚠  No EXTENSION-RESPONSES header observed. Either the server did not\n` +
+        `       advertise a bazaar extension, or the facilitator did not echo a\n` +
+        `       verdict. The catalog probably will not pick us up from this settle.`,
+    );
+  } else if (bazaarVerdict.accepted) {
+    console.log(`    ✅ ACCEPTED by Coinbase facilitator. We should land in the`);
+    console.log(`       Bazaar catalog within ~10 minutes (cache TTL). Poll with:`);
+    console.log(`         pnpm --filter @scoop/api discovery:poll once --full`);
+  } else {
+    console.log(`    ❌ REJECTED. Raw verdict: ${bazaarVerdict.raw}`);
+    console.log(`       Fix the extension shape; settle again.`);
+  }
   console.log(
-    `\n[6] Done. Bazaar's crawler should pick up this settlement within a\n` +
-      `    few minutes. Poll with:\n` +
-      `        pnpm --filter @scoop/api discovery:poll\n` +
-      `    agentic.market republishes from Bazaar within ~24h.`,
+    `\n    agentic.market republishes from Bazaar on its own schedule (~24h).`,
   );
+}
+
+function tryDecodeBase64Json(value: string): unknown {
+  // x402 standard: most diagnostic headers are base64(JSON). Fall back to
+  // returning the raw string if it isn't.
+  try {
+    const padded = value + '='.repeat((4 - (value.length % 4)) % 4);
+    const decoded = Buffer.from(padded, 'base64').toString('utf-8');
+    return JSON.parse(decoded);
+  } catch {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+}
+
+function extractBazaarEntry(decoded: unknown): unknown {
+  // The EXTENSION-RESPONSES payload's exact shape isn't fully nailed in the
+  // docs; we've seen two patterns:
+  //   { bazaar: { status: "accepted" | "rejected", errors?: [...] } }
+  //   [{ name: "bazaar", status: "accepted", ... }]
+  // Walk both.
+  if (decoded && typeof decoded === 'object') {
+    const rec = decoded as Record<string, unknown>;
+    if (rec.bazaar) return rec.bazaar;
+    if (Array.isArray(decoded)) {
+      return decoded.find(
+        (entry) =>
+          entry &&
+          typeof entry === 'object' &&
+          (entry as { name?: string }).name === 'bazaar',
+      );
+    }
+  }
+  return null;
 }
 
 main().catch((err) => {
