@@ -45,3 +45,35 @@ export const PROVIDER_CREDITS: Record<
   rocketreach: { find: 1, verify: 1, intent: 1, search: 1 },
   zoominfo: { find: 1, verify: 1, intent: 1, search: 1 },
 };
+
+/**
+ * Per-provider on/off switch. The waterfall skips any provider where this
+ * is `false`, regardless of whether its env var is configured. Stubs are
+ * `false` by default (they throw not_implemented at runtime); real
+ * providers are `true`.
+ *
+ * Two reasons this exists alongside `isProviderConfigured` (which just
+ * checks the API key env var):
+ *   - Operational kill-switch: temporarily disable a provider experiencing
+ *     issues without removing its env key from Railway.
+ *   - Bring up a new provider in stages: implement, configure the env key,
+ *     then flip `true` to bring it into the chain. Until then, even if the
+ *     key is set, it stays out of the default waterfall.
+ *
+ * A caller that explicitly requests `providers: ['lusha']` via the API
+ * bypasses this and is invoked anyway — kept as an escape hatch for
+ * testing new integrations. See `resolveProviderChain` in services/findEmail.ts.
+ */
+export const PROVIDER_ENABLED: Record<ProviderName, boolean> = {
+  aleads: true,
+  apollo: true,
+  nymeria: true,
+  contactout: true,
+  hunterio: true, // verifier only today, not in finder chains
+  // Stubs — flip to true once the upstream integration is implemented.
+  peopledatalabs: false,
+  snov: false,
+  lusha: false,
+  rocketreach: false,
+  zoominfo: false,
+};

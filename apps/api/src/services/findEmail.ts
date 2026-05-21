@@ -9,6 +9,7 @@ import {
   finders,
   verifiers,
 } from "../providers/registry.js";
+import { PROVIDER_ENABLED } from "../providers/credits.js";
 import { HttpError } from "../middleware/error.js";
 import {
   type EmailType,
@@ -70,10 +71,20 @@ const resolveProviderChain = (
   leads: LeadIdentifier[],
 ): ProviderName[] => {
   const candidates = requested ?? pickChain(leads);
+  // When the caller passes `providers: [...]` explicitly, treat it as an
+  // escape hatch — skip the PROVIDER_ENABLED gate so testers can validate
+  // a new provider before flipping it on for everyone. The config-check
+  // and stub-check still apply: if the env var is missing or the provider
+  // throws not_implemented, it's filtered out anyway.
+  const respectEnabled = requested === undefined;
   const available = candidates.filter((p) => {
     if (!finders[p]) return false;
     if (!isProviderConfigured(p)) {
       logger.warn({ provider: p }, "skipping provider — not configured");
+      return false;
+    }
+    if (respectEnabled && !PROVIDER_ENABLED[p]) {
+      logger.info({ provider: p }, "skipping provider — disabled in PROVIDER_ENABLED");
       return false;
     }
     return true;
