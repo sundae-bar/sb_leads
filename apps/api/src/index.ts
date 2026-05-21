@@ -22,6 +22,13 @@ import { verifyEmailRouter } from './routes/verifyEmail.js';
 
 const app = express();
 
+// Trust Railway / Cloudflare's reverse proxy so req.protocol reads the real
+// scheme from X-Forwarded-Proto. Without this, the x402 middleware advertises
+// `resource.url: http://...` in the 402 payload (the internal scheme Railway
+// uses) instead of `https://...` — and the CDP Bazaar validator may reject
+// http resource URLs, leaving us silently uncatalogued.
+app.set('trust proxy', true);
+
 // CORS: API and web are on different domains in prod (scoop-api-production.up.railway.app
 // vs scoop.sundaebar.ai), so we need an explicit allow-list. `WEB_URL` accepts a
 // comma-separated list so the same env var works for prod ("https://scoop.sundaebar.ai")

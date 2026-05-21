@@ -10,6 +10,66 @@ import { ExactEvmScheme } from '@x402/evm/exact/server';
 import { createFacilitatorConfig } from '@coinbase/x402';
 import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
 import type { Network } from '@x402/core/types';
+import { logger } from '../../logger.js';
+
+// Patch the global fetch with a sniffer for requests to the CDP facilitator,
+// so we can see EXTENSION-RESPONSES (Bazaar's per-extension accept/reject
+// verdict) and any error bodies from verify/settle calls. These calls go
+// facilitator → our server; their response headers aren't echoed to the
+// buyer, so this is the only place to capture them.
+//
+// Scoped to api.cdp.coinbase.com (and the testnet x402.org facilitator) —
+// everything else passes through untouched.
+{
+  const originalFetch = globalThis.fetch;
+  const isFacilitator = (url: string): boolean =>
+    url.includes('api.cdp.coinbase.com') ||
+    url.includes('x402.org/facilitator');
+  globalThis.fetch = async (input, init) => {
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+    const res = await originalFetch(input as Parameters<typeof originalFetch>[0], init);
+    if (!isFacilitator(url)) return res;
+
+    const extResp =
+      res.headers.get('extension-responses') ?? res.headers.get('EXTENSION-RESPONSES');
+    let decoded: unknown = null;
+    if (extResp) {
+      try {
+        const padded = extResp + '='.repeat((4 - (extResp.length % 4)) % 4);
+        decoded = JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'));
+      } catch {
+        decoded = extResp;
+      }
+    }
+    const correlation = res.headers.get('x-correlation-id') ?? undefined;
+    if (res.ok) {
+      logger.info(
+        { facilitator_url: url, status: res.status, extension_responses: decoded, correlation },
+        'CDP facilitator response',
+      );
+    } else {
+      // Clone before reading body — the caller still needs it.
+      const cloned = res.clone();
+      const body = await cloned.text().catch(() => '<unreadable>');
+      logger.warn(
+        {
+          facilitator_url: url,
+          status: res.status,
+          body: body.slice(0, 1000),
+          extension_responses: decoded,
+          correlation,
+        },
+        'CDP facilitator error',
+      );
+    }
+    return res;
+  };
+}
 
 // NOTE on refund-on-empty: `exact` is all-or-nothing — facilitator rejects
 // partial settlement, so we can't refund the buyer in-protocol when
@@ -24,6 +84,15 @@ const NETWORK = (process.env.X402_NETWORK ?? 'eip155:84532') as Network; // Base
 const PAY_TO = process.env.X402_PAY_TO_ADDRESS;
 const PRICE = process.env.X402_FIND_EMAIL_PRICE ?? '$0.25';
 const DISCOVERABLE = process.env.X402_DISCOVERABLE === 'true'; // mainnet-only flag
+// Canonical public URL of the protected resource. Drives both the `resource`
+// field in the 402 payload (what Bazaar catalogs as our endpoint URL) and
+// the paymentPayload.resource the client signs against. Without an explicit
+// value the middleware infers it from req.protocol/host — which on Railway
+// gives us http:// despite `trust proxy` (depending on header chain), and
+// http URLs may be silently rejected by Bazaar's validator.
+const RESOURCE_URL =
+  process.env.X402_RESOURCE_URL ??
+  'https://scoop-api-production.up.railway.app/x402/find-email';
 
 if (!PAY_TO) {
   throw new Error(
@@ -133,6 +202,7 @@ const findEmailDiscovery = declareDiscoveryExtension({
 export const x402Middleware = paymentMiddleware(
   {
     'POST /x402/find-email': {
+      resource: RESOURCE_URL,
       accepts: [
         {
           scheme: 'exact',
