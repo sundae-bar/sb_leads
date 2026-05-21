@@ -19,7 +19,15 @@ findEmailRouter.post('/find-email', requireLeadsAuth, async (req, res, next) => 
     // The Zod refinement already guarantees exactly one mode is set.
     const isNameMode = !urls.length && Boolean(body.full_name);
 
-    const guard = await consumeCredits(req.user.tenantId, 1);
+    const requestId = randomUUID();
+    const guard = await consumeCredits(req.user.tenantId, 1, {
+      kind: 'debit_find',
+      description: isNameMode
+        ? `find_email ${body.full_name} @ ${body.company_domain ?? body.company_name}`
+        : `find_email ${body.linkedin_url ?? body.linkedin_urls?.join(',')}`,
+      refType: 'find_email_request',
+      refId: requestId,
+    });
     if (!guard.ok) {
       res.status(402).json({ error: 'out_of_credits' });
       return;
@@ -55,14 +63,18 @@ findEmailRouter.post('/find-email', requireLeadsAuth, async (req, res, next) => 
       waterfall: body.waterfall ?? true,
       email_types: body.email_types ?? ['work', 'personal'],
       verify: body.verify ?? false,
-      request_id: randomUUID(),
+      request_id: requestId,
       tenant_id: req.user.tenantId,
     });
 
     // Refund the credit when nothing was found.
     const allEmpty = results.every((r) => r.emails.length === 0);
     const creditsRemaining = allEmpty
-      ? (await refundCredits(req.user.tenantId, 1)).remaining
+      ? (await refundCredits(req.user.tenantId, 1, {
+          description: 'no emails returned — refund',
+          refType: 'find_email_request',
+          refId: requestId,
+        })).remaining
       : await getCreditsRemaining(req.user.tenantId);
 
     if (isBatch) {

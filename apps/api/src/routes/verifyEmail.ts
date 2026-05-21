@@ -12,7 +12,13 @@ verifyEmailRouter.post('/verify-email', requireLeadsAuth, async (req, res, next)
   try {
     const body = verifyEmailRequestSchema.parse(req.body);
 
-    const guard = await consumeCredits(req.user.tenantId, 1);
+    const requestId = randomUUID();
+    const guard = await consumeCredits(req.user.tenantId, 1, {
+      kind: 'debit_verify',
+      description: `verify_email ${body.email}`,
+      refType: 'verify_email_request',
+      refId: requestId,
+    });
     if (!guard.ok) {
       res.status(402).json({ error: 'out_of_credits' });
       return;
@@ -21,7 +27,7 @@ verifyEmailRouter.post('/verify-email', requireLeadsAuth, async (req, res, next)
     const result = await verifyEmail({
       email: body.email,
       provider: body.provider as ProviderName | undefined,
-      request_id: randomUUID(),
+      request_id: requestId,
       tenant_id: req.user.tenantId,
     });
     res.json(result);

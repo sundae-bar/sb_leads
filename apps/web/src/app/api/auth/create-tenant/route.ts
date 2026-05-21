@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
-import { PLANS } from '@scoop/types';
+import { SIGNUP_GRANT_CREDITS } from '@scoop/types';
 
 function slugify(name: string): string {
   return name
@@ -78,9 +78,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create membership' }, { status: 500 });
   }
 
-  await db
-    .from('subscriptions')
-    .insert({ tenant_id: tenant.id, plan_id: 'free', credits_remaining: PLANS.free.creditsPerCycle });
+  // Signup grant: insert a `kind='grant'` ledger entry. The
+  // apply_ledger_to_tenant_credits trigger materialises tenant_credits.balance
+  // from this row, so the new workspace starts with SIGNUP_GRANT_CREDITS
+  // ready to use. No subscriptions row created — credit packs only.
+  await db.from('credit_ledger').insert({
+    tenant_id: tenant.id,
+    amount: SIGNUP_GRANT_CREDITS,
+    kind: 'grant',
+    description: 'Signup grant',
+    ref_type: 'signup',
+    ref_id: user.id,
+    actor_id: user.id,
+  });
 
   // Stamp the active tenant onto the user's JWT app_metadata so RLS sees it
   // on subsequent requests. Client must call supabase.auth.refreshSession()

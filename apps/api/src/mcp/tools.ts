@@ -89,7 +89,15 @@ export const registerTools = (server: McpServer, auth: McpAuthContext): void => 
         );
       }
 
-      const guard = await consumeCredits(auth.tenantId, 1);
+      const requestId = randomUUID();
+      const guard = await consumeCredits(auth.tenantId, 1, {
+        kind: "debit_find",
+        description: hasName
+          ? `find_email ${args.full_name} @ ${args.company_domain ?? args.company_name}`
+          : `find_email ${args.linkedin_url ?? args.linkedin_urls?.join(",")}`,
+        refType: "find_email_request",
+        refId: requestId,
+      });
       if (!guard.ok) {
         return errorContent("out_of_credits");
       }
@@ -122,14 +130,18 @@ export const registerTools = (server: McpServer, auth: McpAuthContext): void => 
         waterfall: args.waterfall ?? true,
         email_types: args.email_types ?? ["work", "personal"],
         verify: args.verify ?? false,
-        request_id: randomUUID(),
+        request_id: requestId,
         tenant_id: auth.tenantId,
       });
 
       // Mirror the REST route's "no charge on empty result" behaviour.
       const allEmpty = results.every((r) => r.emails.length === 0);
       if (allEmpty) {
-        await refundCredits(auth.tenantId, 1);
+        await refundCredits(auth.tenantId, 1, {
+          description: "no emails returned — refund",
+          refType: "find_email_request",
+          refId: requestId,
+        });
       }
 
       // Persist results so list_contacts surfaces them. Skip rows without

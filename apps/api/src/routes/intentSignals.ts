@@ -12,7 +12,13 @@ intentSignalsRouter.post('/intent-signals', requireLeadsAuth, async (req, res, n
   try {
     const body = intentRequestSchema.parse(req.body);
 
-    const guard = await consumeCredits(req.user.tenantId, 1);
+    const requestId = randomUUID();
+    const guard = await consumeCredits(req.user.tenantId, 1, {
+      kind: 'debit_intent',
+      description: `intent_signals ${body.linkedin_url ?? body.company_domain ?? body.company_name}`,
+      refType: 'intent_signals_request',
+      refId: requestId,
+    });
     if (!guard.ok) {
       res.status(402).json({ error: 'out_of_credits' });
       return;
@@ -23,7 +29,7 @@ intentSignalsRouter.post('/intent-signals', requireLeadsAuth, async (req, res, n
       company_domain: body.company_domain,
       company_name: body.company_name,
       providers: body.providers as ProviderName[] | undefined,
-      request_id: randomUUID(),
+      request_id: requestId,
       tenant_id: req.user.tenantId,
     });
     res.json(result);

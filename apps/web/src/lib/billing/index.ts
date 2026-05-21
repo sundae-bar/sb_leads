@@ -1,12 +1,21 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   PLANS,
+  type CreditEntryKind,
+  type CreditLedgerEntry,
   type Feature,
-  type PlanId,
   type PlanConfig,
+  type PlanId,
+  type RedeemCouponResult,
+  type TenantCreditsResponse,
 } from '@scoop/types';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe } from './stripe';
+
+// ─── Legacy subscriptions ────────────────────────────────────────────────────
+// Subscriptions still exist for grandfathered customers; the webhook keeps
+// honouring invoice.payment_succeeded for them. No new subscriptions are
+// created. New tenants are credit-pack only — see consumeCredits / topup.
 
 export interface SubscriptionRow {
   tenant_id: string;
@@ -23,14 +32,13 @@ export interface SubscriptionRow {
 }
 
 export async function getSubscription(supabase: SupabaseClient): Promise<SubscriptionRow | null> {
-  const { data } = await supabase.from('subscriptions').select('*').single();
+  const { data } = await supabase.from('subscriptions').select('*').maybeSingle();
   return (data as SubscriptionRow | null) ?? null;
 }
 
 export async function getCurrentPlan(supabase: SupabaseClient): Promise<PlanConfig> {
   const sub = await getSubscription(supabase);
   if (!sub) return PLANS.free;
-  // Downgrade to free if billing is broken — RLS already scopes to tenant.
   if (sub.status === 'canceled' || sub.status === 'past_due') return PLANS.free;
   return PLANS[sub.plan_id] ?? PLANS.free;
 }
@@ -43,81 +51,155 @@ export async function hasFeature(
   return plan.features.includes(feature);
 }
 
+// ─── Credit consumption (new ledger-backed path) ─────────────────────────────
+
+interface ConsumeOptions {
+  /** One of credit_entry_kind PG enum. Defaults to `debit_find`. */
+  kind?: CreditEntryKind;
+  description?: string;
+  refType?: string;
+  refId?: string;
+}
+
 export type ConsumeResult =
   | { ok: true; remaining: number }
-  | { ok: false; reason: 'rebill_triggered' | 'rebill_failed' | 'no_payment_method' | 'throttled' };
+  | { ok: false; reason: 'out_of_credits' };
 
 /**
- * Server-side credit consumption. Race-safe via the consume_credits SQL function.
- * On insufficient credits, attempts an auto-rebill (if enabled and not throttled).
- *
- * Uses adminDb because credit consumption is a privileged operation that runs
- * outside any user request (e.g. background agents) and triggering Stripe
- * requires server credentials.
+ * Atomically debit credits via the consume_credits RPC. Inserts a debit row
+ * in `credit_ledger`; the trigger updates `tenant_credits.balance` under a
+ * row lock. No more auto-rebill — top-ups are explicit user actions now.
  */
 export async function consumeCredits(
   tenantId: string,
   amount: number,
+  opts: ConsumeOptions = {},
 ): Promise<ConsumeResult> {
   const admin = createAdminClient();
-
-  // 1. Atomic decrement.
   const { data: ok } = await admin.rpc('consume_credits', {
     p_tenant_id: tenantId,
     p_amount: amount,
+    p_kind: opts.kind ?? 'debit_find',
+    p_description: opts.description ?? null,
+    p_ref_type: opts.refType ?? null,
+    p_ref_id: opts.refId ?? null,
   });
-  if (ok === true) {
-    const { data: sub } = await admin
-      .from('subscriptions')
-      .select('credits_remaining')
-      .eq('tenant_id', tenantId)
-      .single();
-    return { ok: true, remaining: (sub?.credits_remaining as number) ?? 0 };
-  }
-
-  // 2. Insufficient. Look up the row to decide whether to rebill.
-  const { data: sub } = await admin
-    .from('subscriptions')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .single<SubscriptionRow>();
-  if (!sub) return { ok: false, reason: 'no_payment_method' };
-
-  // Free tier or no Stripe subscription → can't rebill.
-  if (!sub.stripe_subscription_id || sub.plan_id === 'free') {
-    return { ok: false, reason: 'no_payment_method' };
-  }
-  if (!sub.auto_rebill_enabled) {
-    return { ok: false, reason: 'rebill_failed' };
-  }
-
-  // 3. Throttle.
-  const minInterval = PLANS[sub.plan_id].minRebillIntervalSeconds ?? 600;
-  if (
-    sub.last_rebill_at &&
-    Date.now() - new Date(sub.last_rebill_at).getTime() < minInterval * 1000
-  ) {
-    return { ok: false, reason: 'throttled' };
-  }
-
-  // 4. Trigger Stripe to invoice now. Webhook will replenish credits on success.
-  try {
-    await stripe.subscriptions.update(sub.stripe_subscription_id, {
-      billing_cycle_anchor: 'now',
-      proration_behavior: 'none',
-    });
-    await admin
-      .from('subscriptions')
-      .update({ last_rebill_at: new Date().toISOString() })
-      .eq('tenant_id', tenantId);
-    // Credits aren't replenished yet — webhook does that. Caller should retry shortly.
-    return { ok: false, reason: 'rebill_triggered' };
-  } catch {
-    return { ok: false, reason: 'rebill_failed' };
-  }
+  if (ok !== true) return { ok: false, reason: 'out_of_credits' };
+  const remaining = await getCreditsRemaining(tenantId);
+  return { ok: true, remaining };
 }
 
-/** Get-or-create a Stripe Customer for a tenant. Lazy. */
+export async function refundCredits(
+  tenantId: string,
+  amount: number,
+  opts: { description?: string; refType?: string; refId?: string } = {},
+): Promise<{ remaining: number }> {
+  const admin = createAdminClient();
+  await admin.from('credit_ledger').insert({
+    tenant_id: tenantId,
+    amount,
+    kind: 'refund',
+    description: opts.description ?? null,
+    ref_type: opts.refType ?? null,
+    ref_id: opts.refId ?? null,
+  });
+  const remaining = await getCreditsRemaining(tenantId);
+  return { remaining };
+}
+
+export async function getCreditsRemaining(tenantId: string): Promise<number> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from('tenant_credits')
+    .select('balance')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  return (data?.balance as number | undefined) ?? 0;
+}
+
+interface LedgerRow {
+  id: number;
+  tenant_id: string;
+  amount: number;
+  kind: CreditEntryKind;
+  description: string | null;
+  ref_type: string | null;
+  ref_id: string | null;
+  actor_id: string | null;
+  metadata: unknown;
+  created_at: string;
+}
+
+function toLedgerEntry(row: LedgerRow): CreditLedgerEntry {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    amount: row.amount,
+    kind: row.kind,
+    description: row.description,
+    refType: row.ref_type,
+    refId: row.ref_id,
+    actorId: row.actor_id,
+    metadata: row.metadata,
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * User-scoped view of the tenant's credit balance + recent activity. Reads
+ * through the user's supabase client so RLS naturally scopes the data to
+ * the active tenant.
+ */
+export async function getTenantCredits(
+  supabase: SupabaseClient,
+  tenantId: string,
+  limit = 50,
+): Promise<TenantCreditsResponse> {
+  const [{ data: balanceRow }, { data: rows }, { data: sub }] = await Promise.all([
+    supabase.from('tenant_credits').select('balance').eq('tenant_id', tenantId).maybeSingle(),
+    supabase
+      .from('credit_ledger')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    supabase
+      .from('subscriptions')
+      .select('plan_id, status, cycle_ends_at')
+      .eq('tenant_id', tenantId)
+      .maybeSingle(),
+  ]);
+  const balance = (balanceRow?.balance as number | undefined) ?? 0;
+  const recent = ((rows ?? []) as LedgerRow[]).map(toLedgerEntry);
+  const legacyPlan = sub
+    ? {
+        planId: sub.plan_id as PlanId,
+        status: sub.status as string,
+        cycleEndsAt: (sub.cycle_ends_at as string | null) ?? null,
+      }
+    : undefined;
+  return { balance, recent, legacyPlan };
+}
+
+// ─── Coupons ─────────────────────────────────────────────────────────────────
+
+/**
+ * Redeem a coupon code for the caller's active tenant. Calls the SECURITY
+ * DEFINER RPC `redeem_coupon`; everything (auth check, expiry, dedup, ledger
+ * insert) is atomic inside Postgres. Caller must pass the USER-SCOPED
+ * supabase client so auth.uid() + get_active_tenant_id() resolve correctly.
+ */
+export async function redeemCoupon(
+  supabase: SupabaseClient,
+  code: string,
+): Promise<RedeemCouponResult> {
+  const { data, error } = await supabase.rpc('redeem_coupon', { p_code: code });
+  if (error) return { ok: false, error: 'invalid_code' };
+  return data as RedeemCouponResult;
+}
+
+// ─── Stripe Customer helper (used by legacy + new top-up routes) ─────────────
+
 export async function ensureStripeCustomer(
   tenantId: string,
   email: string,
@@ -127,16 +209,21 @@ export async function ensureStripeCustomer(
     .from('subscriptions')
     .select('stripe_customer_id')
     .eq('tenant_id', tenantId)
-    .single();
+    .maybeSingle();
   if (sub?.stripe_customer_id) return sub.stripe_customer_id;
 
   const customer = await stripe.customers.create({
     email,
     metadata: { tenant_id: tenantId },
   });
+  // No subscription row yet (new credit-only tenant) → upsert one so we
+  // have somewhere to stash the customer ID. The row stays at plan=free
+  // and is mostly inert; only the legacy webhook path touches it.
   await admin
     .from('subscriptions')
-    .update({ stripe_customer_id: customer.id })
-    .eq('tenant_id', tenantId);
+    .upsert(
+      { tenant_id: tenantId, stripe_customer_id: customer.id, plan_id: 'free' },
+      { onConflict: 'tenant_id' },
+    );
   return customer.id;
 }
