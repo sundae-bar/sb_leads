@@ -233,72 +233,54 @@ export default function MarketingPage() {
         </div>
       </MarketingSection>
 
-      {/* 005 — Pricing · back to soft off-white so the tier cards punch */}
+      {/* 005 — Pricing · credit packs, not contracts. */}
       <MarketingSection
         number="005"
-        title="Pricing that bills the way agents work."
-        description="Per credit, per cycle. Credits auto-rebill when you run dry; never wait until next month for a deal to clear."
+        title="Credits, not contracts."
+        description="1 credit = $0.01. Pay for what you actually use — no monthly minimum, no renewal cliff. New workspaces get 50 free credits to try the waterfall."
         className="bg-muted"
       >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardDescription className="font-mono text-xs uppercase">Free</CardDescription>
-              <CardTitle className="text-3xl">$0</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <p className="text-sm">
-                <span className="font-medium text-foreground">10</span> credits, no card.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                For kicking the tyres. All providers, no rate caps.
-              </p>
-              <Button asChild variant="outline">
-                <Link href="/signup">Start free</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-foreground/40">
-            <CardHeader>
-              <CardDescription className="font-mono text-xs uppercase">Growth</CardDescription>
-              <CardTitle className="text-3xl">
-                $49<span className="text-base font-normal text-muted-foreground"> /mo</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <p className="text-sm">
-                <span className="font-medium text-foreground">4,000</span> credits per cycle.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Auto-rebill, 14-day trial, all team-member seats.
-              </p>
-              <Button asChild>
-                <Link href="/signup?plan=growth">Choose Growth</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardDescription className="font-mono text-xs uppercase">Business</CardDescription>
-              <CardTitle className="text-3xl">
-                $299<span className="text-base font-normal text-muted-foreground"> /mo</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <p className="text-sm">
-                <span className="font-medium text-foreground">30,000</span> credits per cycle.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Priority providers, dedicated support, custom waterfall.
-              </p>
-              <Button asChild variant="outline">
-                <Link href="/signup?plan=business">Choose Business</Link>
-              </Button>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+          {[
+            { usd: 10, credits: 1_000 },
+            { usd: 25, credits: 2_500 },
+            { usd: 50, credits: 5_000, popular: true },
+            { usd: 100, credits: 10_000 },
+            { usd: 250, credits: 25_000 },
+          ].map((pack) => (
+            <Card
+              key={pack.usd}
+              className={pack.popular ? 'border-foreground/40' : undefined}
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="font-mono text-xs uppercase">
+                  ${pack.usd}
+                  {pack.popular && (
+                    <span className="ml-2 rounded-full bg-foreground px-2 py-0.5 text-[10px] text-background">
+                      popular
+                    </span>
+                  )}
+                </CardDescription>
+                <CardTitle className="text-2xl">
+                  {pack.credits.toLocaleString()}
+                  <span className="ml-1 text-sm font-normal text-muted-foreground">
+                    credits
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button asChild variant={pack.popular ? 'default' : 'outline'} className="w-full">
+                  <Link href="/signup">Get started</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
         </div>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          One credit covers a single find_email, verify_email, or intent
+          lookup. Failed lookups (no email found) are auto-refunded. Top up
+          any time from your workspace — credits never expire.
+        </p>
       </MarketingSection>
 
       {/* CTA — full-bleed dark section with saturated blob, mirrors the hero

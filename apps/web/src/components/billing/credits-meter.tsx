@@ -1,36 +1,56 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { Coins, Sparkles } from 'lucide-react';
 import { useSubscription } from '@/hooks/useBilling';
 import { cn } from '@/lib/utils';
 
-/** Compact credits display for sidebars. */
+/**
+ * Sidebar credits widget. With the ledger model there's no "cycle total" to
+ * compute a percentage against — the balance is just what the tenant has
+ * available. We render the raw count plus a "Top up" CTA when it's getting
+ * low (<= 10) or a sparkle when there's plenty.
+ */
 export function CreditsMeter({ className }: { className?: string }) {
   const { data, isLoading } = useSubscription();
   if (isLoading || !data) return null;
 
-  const total = data.plan.creditsPerCycle;
-  const used = total - data.creditsRemaining;
-  const pct = total > 0 ? Math.min(100, Math.max(0, (used / total) * 100)) : 0;
-  const low = pct >= 90;
+  const balance = data.balance;
+  const low = balance <= 10;
+  const empty = balance <= 0;
 
   return (
-    <div className={cn('flex flex-col gap-1.5 px-2 py-2', className)}>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
-        <Sparkles className="size-3" />
-        <span>
-          {data.creditsRemaining.toLocaleString()} / {total.toLocaleString()} credits
+    <Link
+      href="/app/settings?tab=billing"
+      className={cn(
+        'flex items-center gap-2 rounded-md px-2 py-2 text-xs transition-colors',
+        empty
+          ? 'bg-destructive/10 text-destructive hover:bg-destructive/15'
+          : low
+            ? 'text-muted-foreground hover:bg-accent'
+            : 'text-muted-foreground hover:bg-accent',
+        className,
+      )}
+      title={empty ? 'No credits — top up' : 'View billing'}
+    >
+      {empty ? <Coins className="size-3.5" /> : <Sparkles className="size-3.5" />}
+      <span className="flex-1 truncate">
+        {empty ? (
+          'Out of credits — top up'
+        ) : (
+          <>
+            <span className="font-medium tabular-nums">
+              {balance.toLocaleString()}
+            </span>{' '}
+            credits
+          </>
+        )}
+      </span>
+      {low && !empty && (
+        <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-700">
+          Low
         </span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn(
-            'h-full transition-all',
-            low ? 'bg-destructive' : 'bg-primary',
-          )}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
+      )}
+    </Link>
   );
 }

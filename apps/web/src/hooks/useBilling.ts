@@ -1,9 +1,31 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PlanConfig, PlanId, Feature } from '@scoop/types';
+import type {
+  CreditLedgerEntry,
+  Feature,
+  PlanConfig,
+  PlanId,
+  RedeemCouponResult,
+  TopupPresetUsd,
+} from '@scoop/types';
 
+/**
+ * The single endpoint /api/billing/subscription returns both the new ledger
+ * shape AND legacy aliases for older callers (creditsRemaining, planId,
+ * plan, etc.). Keep both flavours in the type until every reader has moved
+ * to `balance`.
+ */
 export interface SubscriptionResponse {
+  // New shape — ledger-backed
+  balance: number;
+  recent: CreditLedgerEntry[];
+  legacyPlan?: {
+    planId: PlanId;
+    status: string;
+    cycleEndsAt: string | null;
+  };
+  // Legacy aliases (deprecated — read `balance` / `legacyPlan` instead)
   planId: PlanId;
   plan: PlanConfig;
   status: 'active' | 'trialing' | 'past_due' | 'canceled';
@@ -40,6 +62,7 @@ export function useHasFeature(feature: Feature): boolean {
   return data.plan.features.includes(feature);
 }
 
+/** Legacy: kick off a monthly subscription checkout. Not advertised in the new UI. */
 export function useCheckout() {
   return useMutation({
     mutationFn: async (planId: PlanId) => {
@@ -48,6 +71,43 @@ export function useCheckout() {
         body: JSON.stringify({ planId }),
       });
       if (url) window.location.href = url;
+    },
+  });
+}
+
+/** New: kick off a one-time credit top-up. */
+export function useTopupCheckout() {
+  return useMutation({
+    mutationFn: async (amountUsd: TopupPresetUsd) => {
+      const { url } = await apiFetch<{ url: string }>(
+        '/api/billing/topup/checkout',
+        {
+          method: 'POST',
+          body: JSON.stringify({ amountUsd }),
+        },
+      );
+      if (url) window.location.href = url;
+    },
+  });
+}
+
+/** Redeem a coupon code. Returns the RPC verdict (success or one of the named errors). */
+export function useRedeemCoupon() {
+  const qc = useQueryClient();
+  return useMutation<RedeemCouponResult, Error, string>({
+    mutationFn: async (code: string) => {
+      // Note: the route returns 200 on success and 4xx on the failure branches;
+      // we want to capture both as the same RedeemCouponResult union so the UI
+      // can switch on .error rather than re-parsing message strings.
+      const res = await fetch('/api/billing/coupons/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      return (await res.json()) as RedeemCouponResult;
+    },
+    onSuccess: (result) => {
+      if (result.ok) qc.invalidateQueries({ queryKey: ['billing', 'subscription'] });
     },
   });
 }
