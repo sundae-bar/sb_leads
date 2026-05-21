@@ -12,6 +12,8 @@
     "the402:sync": "tsx --env-file=../../.env scripts/sync-the402-services.ts",
     "cdp:create-eoa": "tsx --env-file=../../.env scripts/create-cdp-eoa.ts",
     "x402:self-test": "tsx --env-file=../../.env scripts/x402-self-test.ts",
+    "create-coupon": "tsx --env-file=../../.env scripts/create-coupon.ts",
+    "grant-credits": "tsx --env-file=../../.env scripts/grant-credits.ts",
     "x402:mainnet-pay-once": "tsx --env-file=../../.env scripts/x402-mainnet-pay-once.ts",
     "discovery:poll": "tsx --env-file=../../.env scripts/poll-discovery.ts"
   },

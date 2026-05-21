@@ -32,21 +32,18 @@ export default function OnboardingPage() {
         throw new Error(body.error ?? 'Failed to create workspace');
       }
 
-      // The server just stamped active_tenant_id onto auth.users.app_metadata,
-      // but the user's existing JWT cookie was signed before that update and
-      // doesn't carry the claim. supabase.auth.refreshSession() *should* mint
-      // a new JWT with the latest app_metadata — in practice it often returns
-      // a session object with the right metadata in JS memory while the access
-      // token cookie itself is unchanged. RLS then blocks every tenant-scoped
-      // read (subscription returns 0 credits, etc.).
-      //
-      // The only reliable way to guarantee a JWT with the new claim is to
-      // sign out and re-authenticate. The next sign-in mints a fresh token
-      // from the current app_metadata.
+      // The server just stamped active_tenant_id onto auth.users.app_metadata.
+      // The JWT cookie was signed before that, so it still carries no
+      // active_tenant_id claim — RLS would block every tenant-scoped read
+      // (tenant_credits, conversations, etc.) and the new workspace would
+      // appear empty + credit-less. refreshSession() mints a new JWT against
+      // the latest app_metadata and writes it back via the @supabase/ssr 0.10
+      // getAll/setAll cookie callbacks, so the next request carries the claim.
       const supabase = createClient();
-      await supabase.auth.signOut();
-      toast.success('Workspace created — please sign in to continue.');
-      router.push('/login');
+      await supabase.auth.refreshSession();
+      toast.success('Workspace ready.');
+      router.push('/app');
+      router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong');
     } finally {

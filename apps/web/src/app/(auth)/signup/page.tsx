@@ -72,6 +72,14 @@ export default function SignupPage() {
           body: JSON.stringify({ tenantName: workspaceName || name }),
         })
         if (tenantRes.ok) {
+          // The server just stamped active_tenant_id onto auth.users.app_metadata.
+          // Our JWT cookie was signed before that update, so it still has no
+          // active_tenant_id claim. RLS would then return zero rows for
+          // anything tenant-scoped — including tenant_credits, so the 50 credit
+          // signup grant would appear as a balance of 0 until the user logs
+          // back in. refreshSession() mints a new JWT against the latest
+          // app_metadata and writes it to the cookie.
+          await supabase.auth.refreshSession()
           router.push('/app')
           router.refresh()
         } else {
