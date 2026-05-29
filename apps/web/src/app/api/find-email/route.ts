@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthProvider } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { API_URL } from '@/lib/constants';
 
 async function getToken() {
   const supabase = await createClient();

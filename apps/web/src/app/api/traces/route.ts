@@ -3,8 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getAuthProvider } from '@/lib/auth';
 import type { AgentRun } from '@scoop/types';
 import { transformAgentRunToTrace } from '@/lib/trace-transform';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { API_URL } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthProvider().getCurrentUser();

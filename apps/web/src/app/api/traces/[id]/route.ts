@@ -3,8 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getAuthProvider } from '@/lib/auth';
 import type { AgentRun, AgentRunStep } from '@scoop/types';
 import { transformAgentRunToTrace } from '@/lib/trace-transform';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { API_URL } from '@/lib/constants';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -40,14 +39,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const transformedTrace = transformAgentRunToTrace(traceData, traceData.steps || []);
 
     return NextResponse.json(transformedTrace);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch trace';
     console.error('[traces] error:', error);
-    if (error.message?.includes('404') || error.message?.includes('not found')) {
+    if (message.includes('404') || message.includes('not found')) {
       return NextResponse.json({ error: 'Trace not found' }, { status: 404 });
     }
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch trace' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

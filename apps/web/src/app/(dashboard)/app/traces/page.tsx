@@ -273,8 +273,8 @@ export default function TracesPage() {
                     ) : (
                       filteredTraces.map((trace) => {
                         const timestamp = new Date(trace.startedAt)
-                        const inputTokens = (trace as any).inputTokens ?? trace.promptTokens
-                        const outputTokens = (trace as any).outputTokens ?? trace.completionTokens
+                        const inputTokens = trace.inputTokens ?? trace.promptTokens
+                        const outputTokens = trace.outputTokens ?? trace.completionTokens
 
                         return (
                           <TableRow key={trace.id} className="cursor-pointer hover:bg-muted/50">
