@@ -14,7 +14,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "dev": "tsc --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
+    "prepare": "tsc"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
