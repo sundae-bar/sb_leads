@@ -9,7 +9,6 @@ A pnpm monorepo: Next.js web + Express API + Supabase + Vercel AI SDK. Multi-ten
 | File | Purpose |
 |---|---|
 | [README.md](README.md) | Engineering / marketplace docs index — points into `docs/`. **Holds no setup steps** (those are in the Dev workflow section below). |
-| `agent-starter-plan.md` | Full build spec / target architecture. **Not present in this clone** — restore from the handoff source if needed. Treat as intent, not state. |
 | [docs/the402.md](docs/the402.md) | the402.ai managed-marketplace path (webhook + USDC payouts, 5% fee). |
 | [docs/x402.md](docs/x402.md) | Raw x402 protocol endpoint at `/x402/find-email` (direct USDC on Base, listed on Coinbase Bazaar → agentic.market). |
 | [docs/extending.md](docs/extending.md) | Playbook for new input params, new providers, new services. |
@@ -151,7 +150,6 @@ Useful: `pnpm typecheck`, `pnpm lint`, `pnpm test` (cross-tenant isolation suite
 
 ## When in doubt
 
-- Architecture intent → `agent-starter-plan.md` (not present in this clone — restore from handoff if needed).
 - Setup / commands → the Dev workflow section above.
 - Shared types → [packages/types/src/index.ts](packages/types/src/index.ts) (barrel).
 - Auth flow on the web → [apps/web/src/proxy.ts](apps/web/src/proxy.ts), [apps/web/src/lib/auth/supabase.ts](apps/web/src/lib/auth/supabase.ts).

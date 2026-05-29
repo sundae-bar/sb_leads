@@ -18,7 +18,7 @@ The first three are familiar SaaS plumbing. The last two are the "agent-native" 
 2. [x402.md](docs/x402.md) — the **raw protocol** integration. We expose an HTTP endpoint that speaks x402; agents pay us directly in USDC on Base. This is what gets us indexed on agentic.market and the broader x402 ecosystem.
 3. [extending.md](docs/extending.md) — playbook for: adding a new input parameter (e.g. `name`, `company`), adding a new sourcing provider, adding a new x402 / the402 service alongside `find_email`.
 
-Auth, billing, Supabase RLS, and the chat agent's internals are covered in the root [CLAUDE.md](CLAUDE.md) (and `agent-starter-plan.md`, if restored from the handoff). These docs only cover the marketplace surfaces.
+Auth, billing, Supabase RLS, and the chat agent's internals are covered in the root [CLAUDE.md](CLAUDE.md). These docs only cover the marketplace surfaces.
 
 ## Quick orientation
 
