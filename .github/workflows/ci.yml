@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: typecheck · build · unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # `pnpm install` runs the @scoop/types `prepare` script, which builds that
+      # package's dist/ — required before any consumer can typecheck, build, or
+      # run. This step is what would have caught the "Cannot find module
+      # '@scoop/types'" breakage on a fresh clone.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build API
+        run: pnpm --filter @scoop/api build
+
+      # DB-free subset. The tenancy/billing suites need a live Supabase and run
+      # locally via `pnpm test`. To run them in CI, add a separate job with a
+      # Postgres service (or `supabase` CLI) that applies supabase/migrations
+      # and provides SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY.
+      - name: Unit tests
+        run: pnpm test:unit
+
+      # NOTE: `pnpm lint` is intentionally omitted. It is currently broken on
+      # main: Next 16 removed the `next lint` subcommand, and the workspace's
+      # ESLint setup (mixed v8/v9 + root flat config that doesn't resolve from
+      # apps/web) needs a fix. Add a lint step here once `pnpm lint` runs clean.

@@ -7,6 +7,8 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
     "create-user": "tsx --env-file=.env scripts/create-user.ts",
     "create-admin": "tsx --env-file=.env scripts/create-admin.ts",
     "backfill-active-tenant": "tsx --env-file=.env scripts/backfill-active-tenant.ts"
