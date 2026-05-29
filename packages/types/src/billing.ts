@@ -74,6 +74,90 @@ export interface TenantCreditsResponse {
   };
 }
 
+// ─── Credit operation contracts (shared by apps/api + apps/web) ──────────────
+// The two apps each own a thin DB wrapper (they acquire their admin Supabase
+// client differently), but the *contracts* — the consume_credits RPC arg
+// names, the refund row shape, the option/result types, and the ledger-row →
+// entry mapping — live here so the two surfaces can never drift on the parts
+// that move money.
+
+export interface ConsumeCreditsOptions {
+  /** One of the credit_entry_kind PG enum values. Defaults to `debit_find`. */
+  kind?: CreditEntryKind;
+  /** Free-form human description ("find_email Cykel"). */
+  description?: string;
+  /** Categorical ref (e.g. 'find_email_request', 'verify_email'). */
+  refType?: string;
+  /** ID under refType (e.g. the request UUID). */
+  refId?: string;
+}
+
+export type ConsumeCreditsResult =
+  | { ok: true; remaining: number }
+  | { ok: false; reason: 'out_of_credits' };
+
+/** Build the argument object for the `consume_credits` Postgres RPC. */
+export function consumeCreditsArgs(
+  tenantId: string,
+  amount: number,
+  opts: ConsumeCreditsOptions = {},
+) {
+  return {
+    p_tenant_id: tenantId,
+    p_amount: amount,
+    p_kind: opts.kind ?? 'debit_find',
+    p_description: opts.description ?? null,
+    p_ref_type: opts.refType ?? null,
+    p_ref_id: opts.refId ?? null,
+  };
+}
+
+/** Build the `credit_ledger` insert row for a refund (positive entry). */
+export function refundLedgerRow(
+  tenantId: string,
+  amount: number,
+  opts: Pick<ConsumeCreditsOptions, 'description' | 'refType' | 'refId'> = {},
+) {
+  return {
+    tenant_id: tenantId,
+    amount,
+    kind: 'refund' as const,
+    description: opts.description ?? null,
+    ref_type: opts.refType ?? null,
+    ref_id: opts.refId ?? null,
+  };
+}
+
+/** Raw `credit_ledger` row as returned by Supabase (snake_case). */
+export interface CreditLedgerRow {
+  id: number;
+  tenant_id: string;
+  amount: number;
+  kind: CreditEntryKind;
+  description: string | null;
+  ref_type: string | null;
+  ref_id: string | null;
+  actor_id: string | null;
+  metadata: unknown;
+  created_at: string;
+}
+
+/** Map a raw credit_ledger row to the camelCase CreditLedgerEntry. */
+export function toCreditLedgerEntry(row: CreditLedgerRow): CreditLedgerEntry {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    amount: row.amount,
+    kind: row.kind,
+    description: row.description,
+    refType: row.ref_type,
+    refId: row.ref_id,
+    actorId: row.actor_id,
+    metadata: row.metadata,
+    createdAt: row.created_at,
+  };
+}
+
 // ─── Coupon types ────────────────────────────────────────────────────────────
 export interface Coupon {
   id: string;
