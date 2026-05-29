@@ -33,6 +33,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Lint
+        run: pnpm lint
+
       - name: Build API
         run: pnpm --filter @scoop/api build
 
@@ -42,8 +45,3 @@ jobs:
       # and provides SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY.
       - name: Unit tests
         run: pnpm test:unit
-
-      # NOTE: `pnpm lint` is intentionally omitted. It is currently broken on
-      # main: Next 16 removed the `next lint` subcommand, and the workspace's
-      # ESLint setup (mixed v8/v9 + root flat config that doesn't resolve from
-      # apps/web) needs a fix. Add a lint step here once `pnpm lint` runs clean.

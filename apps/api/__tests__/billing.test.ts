@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 
