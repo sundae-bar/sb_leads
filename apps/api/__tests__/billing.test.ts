@@ -15,7 +15,7 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: 
 const tenants: string[] = [];
 const events: string[] = [];
 
-async function makeTenant(creditsRemaining = 100): Promise<string> {
+async function makeTenant(credits = 100): Promise<string> {
   const slug = `bill-${randomUUID().slice(0, 8)}`;
   const { data, error } = await admin
     .from('tenants')
@@ -25,14 +25,38 @@ async function makeTenant(creditsRemaining = 100): Promise<string> {
   if (error || !data) throw error ?? new Error('failed to create tenant');
   tenants.push(data.id);
 
-  // Seed subscription row (the migration's backfill only covers existing tenants).
+  // Seed the legacy subscriptions row (still used for plan info + the lifecycle
+  // tests below). credits_remaining is NOT the source of truth post-0016.
   await admin.from('subscriptions').upsert({
     tenant_id: data.id,
     plan_id: 'free',
-    credits_remaining: creditsRemaining,
+    credits_remaining: credits,
   });
 
+  // Seed the actual credit balance via the ledger. The
+  // apply_ledger_to_tenant_credits trigger materialises tenant_credits.balance,
+  // which is what consume_credits reads/decrements (migration 0016).
+  if (credits > 0) {
+    const { error: ledgerErr } = await admin.from('credit_ledger').insert({
+      tenant_id: data.id,
+      amount: credits,
+      kind: 'grant',
+      description: 'test seed',
+    });
+    if (ledgerErr) throw ledgerErr;
+  }
+
   return data.id;
+}
+
+/** Ledger-derived balance — the post-0016 source of truth consume_credits uses. */
+async function balanceOf(tenantId: string): Promise<number> {
+  const { data } = await admin
+    .from('tenant_credits')
+    .select('balance')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  return (data?.balance as number | undefined) ?? 0;
 }
 
 afterAll(async () => {
@@ -52,13 +76,7 @@ describe('consume_credits SQL function', () => {
       p_amount: 3,
     });
     expect(ok).toBe(true);
-
-    const { data: sub } = await admin
-      .from('subscriptions')
-      .select('credits_remaining')
-      .eq('tenant_id', tenantId)
-      .single();
-    expect(sub?.credits_remaining).toBe(7);
+    expect(await balanceOf(tenantId)).toBe(7);
   });
 
   it('returns false and does not decrement when insufficient', async () => {
@@ -68,13 +86,7 @@ describe('consume_credits SQL function', () => {
       p_amount: 5,
     });
     expect(ok).toBe(false);
-
-    const { data: sub } = await admin
-      .from('subscriptions')
-      .select('credits_remaining')
-      .eq('tenant_id', tenantId)
-      .single();
-    expect(sub?.credits_remaining).toBe(2);
+    expect(await balanceOf(tenantId)).toBe(2); // unchanged
   });
 
   it('is race-safe under concurrent decrements', async () => {
@@ -90,13 +102,7 @@ describe('consume_credits SQL function', () => {
     const failures = results.filter((r) => r.data === false).length;
     expect(successes).toBe(50);
     expect(failures).toBe(50);
-
-    const { data: sub } = await admin
-      .from('subscriptions')
-      .select('credits_remaining')
-      .eq('tenant_id', tenantId)
-      .single();
-    expect(sub?.credits_remaining).toBe(0);
+    expect(await balanceOf(tenantId)).toBe(0);
   });
 });
 
