@@ -69,11 +69,13 @@ jobs:
         with:
           version: latest
 
-      # Boots the full local stack (Postgres + GoTrue + PostgREST + …) via
-      # Docker and applies supabase/migrations. The auth-backed RLS tests need
-      # GoTrue, so a bare Postgres service container won't do.
+      # Boots the local stack (Postgres + GoTrue + PostgREST + …) via Docker and
+      # applies supabase/migrations. The auth-backed RLS tests need GoTrue, so a
+      # bare Postgres service container won't do. Exclude the email (inbucket)
+      # and studio containers — unused by the tests, and their host ports
+      # (54333-54336) collide on the CI runner.
       - name: Start Supabase
-        run: supabase start
+        run: supabase start -x inbucket,studio
 
       # Map the CLI's env output to the SUPABASE_* names the tests read, then
       # run the Supabase-backed suites (RLS isolation + consume_credits atomicity).
