@@ -6,6 +6,7 @@ import path from 'node:path';
 export default defineConfig({
   test: {
     environment: 'node',
+    setupFiles: ['./vitest.setup.ts'],
     include: ['__tests__/**/*.test.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,
