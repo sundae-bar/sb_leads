@@ -9,6 +9,7 @@ A pnpm monorepo: Next.js web + Express API + Supabase + Vercel AI SDK. Multi-ten
 | File | Purpose |
 |---|---|
 | [README.md](README.md) | Engineering / marketplace docs index — points into `docs/`. **Holds no setup steps** (those are in the Dev workflow section below). |
+| [docs/environments.md](docs/environments.md) | Local / staging / production topology (Supabase branching), migration flow, per-environment secrets. |
 | [docs/the402.md](docs/the402.md) | the402.ai managed-marketplace path (webhook + USDC payouts, 5% fee). |
 | [docs/x402.md](docs/x402.md) | Raw x402 protocol endpoint at `/x402/find-email` (direct USDC on Base, listed on Coinbase Bazaar → agentic.market). |
 | [docs/extending.md](docs/extending.md) | Playbook for new input params, new providers, new services. |
