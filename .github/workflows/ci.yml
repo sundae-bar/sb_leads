@@ -77,10 +77,18 @@ jobs:
 
       # Map the CLI's env output to the SUPABASE_* names the tests read, then
       # run the Supabase-backed suites (RLS isolation + consume_credits atomicity).
-      - name: Run integration tests
+      - name: Run API integration tests
         run: |
           eval "$(supabase status -o env | sed 's/^/export /')"
           export SUPABASE_URL="$API_URL" \
                  SUPABASE_ANON_KEY="$ANON_KEY" \
                  SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
           pnpm --filter @scoop/api test:integration
+
+      # Stripe webhook test (credit top-up flow) — needs the same DB. It maps
+      # SUPABASE_URL → NEXT_PUBLIC_SUPABASE_URL and stubs the Stripe envs itself.
+      - name: Run web integration tests
+        run: |
+          eval "$(supabase status -o env | sed 's/^/export /')"
+          export SUPABASE_URL="$API_URL" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          pnpm --filter @scoop/web test:integration
