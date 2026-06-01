@@ -5,6 +5,7 @@ import { findEmails } from '../../services/findEmail.js';
 import { logger } from '../../logger.js';
 import { LISTED_SERVICES } from './services.js';
 import { verifyWebhookSignature } from './signature.js';
+import { validateCallbackUrl } from './callback-url.js';
 
 /** Body shape per the402.ai's docs (best-effort — verified at parse time). */
 interface The402WebhookEvent {
@@ -113,6 +114,27 @@ export async function handleThe402Webhook(req: Request, res: Response): Promise<
 
     if (!event.callback_url) {
       throw new Error('job_dispatch missing callback_url');
+    }
+
+    // SSRF guard: validate the callback BEFORE doing any (paid) provider work,
+    // so an unsafe URL can't make us hit internal infra or burn provider calls
+    // on an undeliverable result.
+    const urlCheck = validateCallbackUrl(event.callback_url);
+    if (!urlCheck.ok) {
+      logger.warn(
+        { event_id: event.id, callback: event.callback_url, reason: urlCheck.reason },
+        'the402 unsafe callback_url rejected',
+      );
+      await adminDb
+        .from('the402_events')
+        .update({
+          processed_at: new Date().toISOString(),
+          error: `unsafe_callback_url:${urlCheck.reason}`,
+        })
+        .eq('event_id', event.id);
+      // 400 (not 5xx) — the callback won't get safer on retry.
+      res.status(400).json({ error: 'unsafe_callback_url', reason: urlCheck.reason });
+      return;
     }
 
     // Look up which of our services this dispatch belongs to.
