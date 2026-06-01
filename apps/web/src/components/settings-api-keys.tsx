@@ -106,9 +106,9 @@ export function SettingsApiKeys() {
       setNewKeyName("")
       setNewKeyExpiry("never")
       toast.success("API key created successfully")
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to create API key:', err)
-      toast.error(err.message || "Failed to create API key")
+      toast.error(err instanceof Error ? err.message : "Failed to create API key")
     }
   }
 
@@ -125,9 +125,9 @@ export function SettingsApiKeys() {
       setIsDeleteOpen(false)
       setKeyToDelete(null)
       toast.success("API key deleted")
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete API key:', err)
-      toast.error(err.message || "Failed to delete API key")
+      toast.error(err instanceof Error ? err.message : "Failed to delete API key")
     }
   }
 

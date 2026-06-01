@@ -90,7 +90,7 @@ export default function SignupPage() {
         toast.success("Account created! Check your email to verify your account, then log in to set up your workspace.")
         router.push("/login")
       }
-    } catch (err) {
+    } catch {
       toast.error("An error occurred during signup")
       setIsLoading(false)
     }

@@ -154,12 +154,33 @@ async function handleTopupCompleted(session: Stripe.Checkout.Session, admin: Adm
   // or it's missing (webhook raced the INSERT — reconstruct from metadata).
   const { data: existing } = await admin
     .from('stripe_topup_sessions')
-    .select('status, ledger_entry_id')
+    .select('status, ledger_entry_id, tenant_id')
     .eq('session_id', session.id)
     .maybeSingle();
   if (existing?.status === 'completed') {
     console.info('[stripe-webhook] topup already credited:', session.id);
     return;
+  }
+
+  // Ownership guard. The pending row we wrote at checkout time is the source of
+  // truth for which tenant owns this session. If the event metadata claims a
+  // different tenant, refuse (defense-in-depth against tampered/mis-set
+  // metadata). If the pending row is missing (webhook raced our INSERT), fall
+  // back to confirming the metadata tenant actually exists before crediting.
+  if (existing && existing.tenant_id !== tenantId) {
+    console.warn('[stripe-webhook] topup tenant mismatch (metadata vs pending row):', session.id);
+    return;
+  }
+  if (!existing) {
+    const { data: tenant } = await admin
+      .from('tenants')
+      .select('id')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (!tenant) {
+      console.warn('[stripe-webhook] topup for unknown tenant_id:', tenantId, session.id);
+      return;
+    }
   }
 
   // Insert the ledger entry. The trigger applies it to tenant_credits.

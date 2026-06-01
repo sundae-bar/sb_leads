@@ -1,8 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   PLANS,
-  type CreditEntryKind,
-  type CreditLedgerEntry,
+  consumeCreditsArgs,
+  refundLedgerRow,
+  toCreditLedgerEntry,
+  type ConsumeCreditsOptions,
+  type ConsumeCreditsResult,
+  type CreditLedgerRow,
   type Feature,
   type PlanConfig,
   type PlanId,
@@ -52,18 +56,11 @@ export async function hasFeature(
 }
 
 // ─── Credit consumption (new ledger-backed path) ─────────────────────────────
+// Contracts (RPC args, refund row, option/result types, ledger mapping) come
+// from @scoop/types so this stays in lockstep with the apps/api counterpart.
 
-interface ConsumeOptions {
-  /** One of credit_entry_kind PG enum. Defaults to `debit_find`. */
-  kind?: CreditEntryKind;
-  description?: string;
-  refType?: string;
-  refId?: string;
-}
-
-export type ConsumeResult =
-  | { ok: true; remaining: number }
-  | { ok: false; reason: 'out_of_credits' };
+export type ConsumeOptions = ConsumeCreditsOptions;
+export type ConsumeResult = ConsumeCreditsResult;
 
 /**
  * Atomically debit credits via the consume_credits RPC. Inserts a debit row
@@ -76,14 +73,7 @@ export async function consumeCredits(
   opts: ConsumeOptions = {},
 ): Promise<ConsumeResult> {
   const admin = createAdminClient();
-  const { data: ok } = await admin.rpc('consume_credits', {
-    p_tenant_id: tenantId,
-    p_amount: amount,
-    p_kind: opts.kind ?? 'debit_find',
-    p_description: opts.description ?? null,
-    p_ref_type: opts.refType ?? null,
-    p_ref_id: opts.refId ?? null,
-  });
+  const { data: ok } = await admin.rpc('consume_credits', consumeCreditsArgs(tenantId, amount, opts));
   if (ok !== true) return { ok: false, reason: 'out_of_credits' };
   const remaining = await getCreditsRemaining(tenantId);
   return { ok: true, remaining };
@@ -95,14 +85,7 @@ export async function refundCredits(
   opts: { description?: string; refType?: string; refId?: string } = {},
 ): Promise<{ remaining: number }> {
   const admin = createAdminClient();
-  await admin.from('credit_ledger').insert({
-    tenant_id: tenantId,
-    amount,
-    kind: 'refund',
-    description: opts.description ?? null,
-    ref_type: opts.refType ?? null,
-    ref_id: opts.refId ?? null,
-  });
+  await admin.from('credit_ledger').insert(refundLedgerRow(tenantId, amount, opts));
   const remaining = await getCreditsRemaining(tenantId);
   return { remaining };
 }
@@ -115,34 +98,6 @@ export async function getCreditsRemaining(tenantId: string): Promise<number> {
     .eq('tenant_id', tenantId)
     .maybeSingle();
   return (data?.balance as number | undefined) ?? 0;
-}
-
-interface LedgerRow {
-  id: number;
-  tenant_id: string;
-  amount: number;
-  kind: CreditEntryKind;
-  description: string | null;
-  ref_type: string | null;
-  ref_id: string | null;
-  actor_id: string | null;
-  metadata: unknown;
-  created_at: string;
-}
-
-function toLedgerEntry(row: LedgerRow): CreditLedgerEntry {
-  return {
-    id: row.id,
-    tenantId: row.tenant_id,
-    amount: row.amount,
-    kind: row.kind,
-    description: row.description,
-    refType: row.ref_type,
-    refId: row.ref_id,
-    actorId: row.actor_id,
-    metadata: row.metadata,
-    createdAt: row.created_at,
-  };
 }
 
 /**
@@ -170,7 +125,7 @@ export async function getTenantCredits(
       .maybeSingle(),
   ]);
   const balance = (balanceRow?.balance as number | undefined) ?? 0;
-  const recent = ((rows ?? []) as LedgerRow[]).map(toLedgerEntry);
+  const recent = ((rows ?? []) as CreditLedgerRow[]).map(toCreditLedgerEntry);
   const legacyPlan = sub
     ? {
         planId: sub.plan_id as PlanId,

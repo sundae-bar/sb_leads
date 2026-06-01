@@ -184,11 +184,11 @@ function TimelineStep({ step, isLast }: { step: TraceStep; isLast: boolean }) {
                 />
               </div>
             )}
-            {(step as any).error && (
+            {step.error && (
               <div className="min-w-0">
                 <div className="mb-1 text-xs font-medium text-red-600 dark:text-red-400">Error</div>
                 <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400 break-words overflow-wrap-anywhere">
-                  {(step as any).error}
+                  {step.error}
                 </div>
               </div>
             )}
@@ -256,7 +256,7 @@ export default function TraceDetailPage() {
           {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold">{(trace as any).name || (trace as any).agentName || 'Trace'}</h1>
+              <h1 className="text-2xl font-bold">{trace.name || 'Trace'}</h1>
               <p className="mt-1 font-mono text-sm text-muted-foreground">{trace.id}</p>
             </div>
             <StatusBadge status={trace.status as "success" | "error" | "running"} />
@@ -279,7 +279,7 @@ export default function TraceDetailPage() {
                 <CardDescription>Duration</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-xl font-semibold">{formatDuration((trace as any).duration || (trace as any).durationMs || 0)}</div>
+                <div className="text-xl font-semibold">{formatDuration(trace.duration || 0)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -289,7 +289,7 @@ export default function TraceDetailPage() {
               <CardContent>
                 <div className="text-xl font-semibold">{(trace.totalTokens || 0).toLocaleString()}</div>
                 <div className="text-xs text-muted-foreground">
-                  {((trace as any).promptTokens || 0).toLocaleString()} in / {((trace as any).completionTokens || 0).toLocaleString()} out
+                  {(trace.promptTokens || 0).toLocaleString()} in / {(trace.completionTokens || 0).toLocaleString()} out
                 </div>
               </CardContent>
             </Card>
@@ -308,17 +308,17 @@ export default function TraceDetailPage() {
             <CardHeader>
               <CardTitle>Execution Timeline</CardTitle>
               <CardDescription>
-                Step-by-step breakdown of the agent execution ({((trace as any).steps || []).length} steps)
+                Step-by-step breakdown of the agent execution ({trace.steps.length} steps)
               </CardDescription>
             </CardHeader>
             <CardContent className="overflow-hidden">
               <Separator className="mb-6" />
               <div className="relative min-w-0">
-                {((trace as any).steps || []).map((step: TraceStep, i: number) => (
+                {trace.steps.map((step, i) => (
                   <TimelineStep
                     key={step.id}
                     step={step}
-                    isLast={i === ((trace as any).steps || []).length - 1}
+                    isLast={i === trace.steps.length - 1}
                   />
                 ))}
               </div>

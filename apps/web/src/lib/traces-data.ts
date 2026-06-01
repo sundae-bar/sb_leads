@@ -1,3 +1,5 @@
+import { MS_PER_MINUTE, MS_PER_HOUR, MS_PER_DAY } from "./constants"
+
 export type StepType = "llm-call" | "tool-call" | "tool-result" | "text-output" | "error"
 
 export interface TraceStep {
@@ -16,6 +18,8 @@ export interface TraceStep {
   toolName?: string
   args?: string
   result?: string
+  // Error steps
+  error?: string
 }
 
 export interface Trace {
@@ -30,6 +34,10 @@ export interface Trace {
   startedAt: string
   steps: TraceStep[]
   totalSteps: number
+  // Optional aliases some UI surfaces read (populated by transformAgentRunToTrace).
+  inputTokens?: number
+  outputTokens?: number
+  timestamp?: Date
 }
 
 export const traces: Trace[] = [
@@ -618,9 +626,9 @@ export function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date("2026-03-05T09:15:00Z")
   const diffMs = now.getTime() - date.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  const diffHr = Math.floor(diffMs / 3600000)
-  const diffDay = Math.floor(diffMs / 86400000)
+  const diffMin = Math.floor(diffMs / MS_PER_MINUTE)
+  const diffHr = Math.floor(diffMs / MS_PER_HOUR)
+  const diffDay = Math.floor(diffMs / MS_PER_DAY)
 
   if (diffMin < 1) return "just now"
   if (diffMin < 60) return `${diffMin}m ago`
