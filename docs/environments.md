@@ -22,10 +22,34 @@ We use **Supabase Branching** (Pro feature), not separate projects:
 
 1. Write the migration locally, apply with `supabase db reset` (re-runs all migrations + `seed.sql`).
 2. Open a PR → Supabase spins up a preview branch and applies the migration there. CI also runs the suite against a throwaway `supabase start` stack.
-3. Merge to `main` → the production branch applies pending migrations.
-4. Promote to the `staging` branch by pushing the migrations to it (or merging the git branch Supabase associates with `staging`).
+3. Merge the PR into `staging` → the Supabase `staging` branch applies the migrations; validate there.
+4. Promote `staging` → `main` (see [Merge & promotion strategy](#merge--promotion-strategy)) → the production branch applies them.
 
 `seed.sql` runs on **local + every Supabase branch**, but **not** on production (`db push` applies migrations only). Keep it synthetic — see [supabase/seed.sql](../supabase/seed.sql) (currently a QA credit coupon, `STAGINGCREDITS`).
+
+## Merge & promotion strategy
+
+Changes flow one direction only: **feature branch → `staging` → `main`**. Keeping the flow
+one-directional is what stops `staging` and `main` from diverging, so promotions never hit
+merge conflicts.
+
+- **Feature → `staging`:** squash-merge (tidy) or merge commit — your call.
+- **`staging` → `main` (promotion):** **always a merge commit — never _squash_, never _rebase_.**
+  Squashing the promotion creates a `main`-only commit and diverges the two branches; that's the
+  usual source of phantom conflicts on the next promotion.
+- **Never commit directly to `main`.** Every change enters through `staging` first.
+- **Hotfixes:** route through `staging` when you can. If you must commit straight to `main`,
+  immediately `git merge main` into `staging` to re-sync.
+
+Invariant to hold: **`main` is always fast-forwardable to `staging`.** While that holds, there is
+nothing to conflict.
+
+Repo settings already allow merge commits. `delete_branch_on_merge` is intentionally **off** — with
+it on, merging a `staging → main` PR would try to delete the long-lived `staging` branch.
+
+Recommended next step (not yet enabled): branch-protect `main` and `staging` — require a PR, block
+direct pushes / force-push / deletion. If you require a status check, require **quality** (runs on
+every PR), not **integration** (skipped on docs-only PRs — a skipped _required_ check blocks merges).
 
 ## Per-environment variables (what differs)
 
