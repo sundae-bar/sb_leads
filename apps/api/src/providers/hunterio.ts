@@ -39,12 +39,12 @@ interface VerifierResponse {
 
 export const hunterioVerifier: EmailVerifier = {
   name: "hunterio",
-  async verifyEmail(email: string): Promise<VerifyOutput> {
+  async verifyEmail(email: string, signal?: AbortSignal): Promise<VerifyOutput> {
     await throttle();
     const u = new URL(`${BASE}/email-verifier`);
     u.searchParams.set("email", email);
     u.searchParams.set("api_key", config.providers.hunterio);
-    const res = await request(u, { method: "GET" });
+    const res = await request(u, { method: "GET", signal });
     if (res.statusCode >= 400) {
       const text = await res.body.text();
       throw new ProviderError("hunterio", `verify ${res.statusCode}: ${text}`);

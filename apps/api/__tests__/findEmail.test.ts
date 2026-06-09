@@ -174,3 +174,50 @@ describe('findEmails waterfall', () => {
     ).rejects.toMatchObject({ message: 'no_configured_providers' });
   });
 });
+
+describe('findEmails cancellation (AbortSignal)', () => {
+  it('stops the waterfall before the next round once aborted', async () => {
+    const controller = new AbortController();
+    // p1 finds nothing AND aborts mid-flight (as the x402 deadline would),
+    // so the waterfall must stop instead of falling through to p2.
+    p1.mockImplementation(async (input: FindEmailsInput): Promise<FindEmailsOutput> => {
+      controller.abort();
+      return respondWith(() => [])(input);
+    });
+    p2.mockImplementation(respondWith(() => [{ address: 'b@x.com', type: 'work', provider: 'apollo' }]));
+
+    const res = await findEmails({
+      ...baseOpts,
+      linkedin_urls: [url('cancelled')],
+      signal: controller.signal,
+    });
+
+    expect(p2).not.toHaveBeenCalled();
+    expect(res[0]!.emails).toEqual([]);
+    expect(res[0]!.providers_attempted.map((a) => a.provider)).toEqual(['aleads']);
+  });
+
+  it('passes the signal through to each provider', async () => {
+    const controller = new AbortController();
+    p1.mockImplementation(respondWith(() => [{ address: 'a@x.com', type: 'work', provider: 'aleads' }]));
+
+    await findEmails({
+      ...baseOpts,
+      linkedin_urls: [url('signal-through')],
+      signal: controller.signal,
+    });
+
+    expect(p1.mock.calls[0]![0].signal).toBe(controller.signal);
+  });
+
+  it('runs the full waterfall when no signal is provided (unchanged behavior)', async () => {
+    p1.mockImplementation(respondWith(() => []));
+    p2.mockImplementation(respondWith(() => [{ address: 'b@x.com', type: 'work', provider: 'apollo' }]));
+
+    const res = await findEmails({ ...baseOpts, linkedin_urls: [url('no-signal')] });
+
+    expect(p1).toHaveBeenCalledOnce();
+    expect(p2).toHaveBeenCalledOnce();
+    expect(res[0]!.emails.map((e) => e.address)).toEqual(['b@x.com']);
+  });
+});

@@ -118,7 +118,10 @@ interface MatchParams {
  * One call to /people/match. Apollo's docs say this endpoint accepts EITHER
  * a linkedin_url OR a name+org pair — we pass through whichever we have.
  */
-const matchOne = async (params: MatchParams): Promise<ApolloPerson | undefined> => {
+const matchOne = async (
+  params: MatchParams,
+  signal?: AbortSignal,
+): Promise<ApolloPerson | undefined> => {
   const u = new URL(`${BASE}/people/match`);
   if (params.linkedin_url) u.searchParams.set("linkedin_url", params.linkedin_url);
   if (params.first_name) u.searchParams.set("first_name", params.first_name);
@@ -129,7 +132,7 @@ const matchOne = async (params: MatchParams): Promise<ApolloPerson | undefined> 
     u.searchParams.set("organization_name", params.organization_name);
   }
   u.searchParams.set("reveal_personal_emails", "true");
-  const res = await request(u, { method: "POST", headers: headers() });
+  const res = await request(u, { method: "POST", headers: headers(), signal });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
     throw new ProviderError("apollo", `people/match ${res.statusCode}: ${text}`);
@@ -144,13 +147,17 @@ const matchOne = async (params: MatchParams): Promise<ApolloPerson | undefined> 
  * For name-mode queries we fall back to N sequential matchOne calls (Apollo
  * doesn't have a bulk name-match endpoint).
  */
-const matchBulk = async (urls: string[]): Promise<Array<ApolloPerson | undefined>> => {
+const matchBulk = async (
+  urls: string[],
+  signal?: AbortSignal,
+): Promise<Array<ApolloPerson | undefined>> => {
   const u = new URL(`${BASE}/people/bulk_match`);
   u.searchParams.set("reveal_personal_emails", "true");
   const res = await request(u, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ details: urls.map((linkedin_url) => ({ linkedin_url })) }),
+    signal,
   });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
@@ -160,17 +167,23 @@ const matchBulk = async (urls: string[]): Promise<Array<ApolloPerson | undefined
   return (json.matches ?? []).map((m) => m ?? undefined);
 };
 
-const matchForLead = async (lead: LeadIdentifier): Promise<ApolloPerson | undefined> => {
+const matchForLead = async (
+  lead: LeadIdentifier,
+  signal?: AbortSignal,
+): Promise<ApolloPerson | undefined> => {
   if (lead.kind === "linkedin") {
-    return matchOne({ linkedin_url: lead.linkedin_url });
+    return matchOne({ linkedin_url: lead.linkedin_url }, signal);
   }
-  return matchOne({
-    name: lead.full_name,
-    first_name: lead.first_name,
-    last_name: lead.last_name,
-    domain: lead.company_domain,
-    organization_name: lead.company_name,
-  });
+  return matchOne(
+    {
+      name: lead.full_name,
+      first_name: lead.first_name,
+      last_name: lead.last_name,
+      domain: lead.company_domain,
+      organization_name: lead.company_name,
+    },
+    signal,
+  );
 };
 
 export const apolloFinder: EmailFinder = {
@@ -193,7 +206,10 @@ export const apolloFinder: EmailFinder = {
         await Promise.all(
           urlLeads.map(async (l) => {
             try {
-              personByKey.set(leadKey(l), await matchOne({ linkedin_url: l.linkedin_url }));
+              personByKey.set(
+                leadKey(l),
+                await matchOne({ linkedin_url: l.linkedin_url }, input.signal),
+              );
             } catch (err) {
               logger.warn({ err, lead: l }, "apollo single URL match failed");
               personByKey.set(leadKey(l), undefined);
@@ -202,9 +218,13 @@ export const apolloFinder: EmailFinder = {
         );
       } else {
         for (let i = 0; i < urlLeads.length; i += 10) {
+          if (input.signal?.aborted) break; // caller stopped waiting
           const chunk = urlLeads.slice(i, i + 10);
           try {
-            const matches = await matchBulk(chunk.map((l) => l.linkedin_url));
+            const matches = await matchBulk(
+              chunk.map((l) => l.linkedin_url),
+              input.signal,
+            );
             chunk.forEach((l, idx) => personByKey.set(leadKey(l), matches[idx]));
           } catch (err) {
             logger.warn({ err, count: chunk.length }, "apollo bulk match failed");
@@ -219,8 +239,9 @@ export const apolloFinder: EmailFinder = {
     // out at once. In practice the chat agent calls these one-at-a-time
     // anyway.
     for (const l of nameLeads) {
+      if (input.signal?.aborted) break; // caller stopped waiting
       try {
-        personByKey.set(leadKey(l), await matchForLead(l));
+        personByKey.set(leadKey(l), await matchForLead(l, input.signal));
       } catch (err) {
         logger.warn({ err, lead: l }, "apollo name match failed");
         personByKey.set(leadKey(l), undefined);
