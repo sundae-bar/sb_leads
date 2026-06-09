@@ -52,6 +52,7 @@ const linkedinUsernameFromUrl = (url: string): string => {
 
 const advancedSearch = async (
   filters: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<AleadsContact | null> => {
   const res = await request(`${BASE}/search/advanced-search`, {
     method: "POST",
@@ -61,6 +62,7 @@ const advancedSearch = async (
       current_page: 0,
       search_type: "total",
     }),
+    signal,
   });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
@@ -72,8 +74,8 @@ const advancedSearch = async (
   return json.data?.results?.[0] ?? null;
 };
 
-const searchByLinkedinUsername = (username: string) =>
-  advancedSearch({ linkedin_username: [username] });
+const searchByLinkedinUsername = (username: string, signal?: AbortSignal) =>
+  advancedSearch({ linkedin_username: [username] }, signal);
 
 /**
  * Name-mode search. Aleads' advanced-search accepts free-text filters on
@@ -85,17 +87,19 @@ const searchByName = (
   fullName: string,
   domain: string | undefined,
   companyName: string | undefined,
+  signal?: AbortSignal,
 ) => {
   const filters: Record<string, unknown> = { name: [fullName] };
   if (domain) filters.domain = [domain];
   else if (companyName) filters.company_name = [companyName];
-  return advancedSearch(filters);
+  return advancedSearch(filters, signal);
 };
 
 const unlockEmail = async (
   contact: AleadsContact,
   hints: FindEmailHints | undefined,
   type: "personal" | "work",
+  signal?: AbortSignal,
 ): Promise<string | null> => {
   const documentId = hints?.document_id ?? contact.document_id;
   const firstName = hints?.first_name ?? contact.member_first_name ?? "";
@@ -118,6 +122,7 @@ const unlockEmail = async (
           : "",
       },
     }),
+    signal,
   });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
@@ -136,17 +141,19 @@ const unlockEmail = async (
  */
 const searchForLead = async (
   lead: LeadIdentifier,
+  signal?: AbortSignal,
 ): Promise<{ contact: AleadsContact | null; searchCredits: number }> => {
   if (lead.kind === "linkedin") {
     const username = linkedinUsernameFromUrl(lead.linkedin_url);
     if (!username) return { contact: null, searchCredits: 0 };
-    const contact = await searchByLinkedinUsername(username);
+    const contact = await searchByLinkedinUsername(username, signal);
     return { contact, searchCredits: PROVIDER_CREDITS.aleads.search };
   }
   const contact = await searchByName(
     lead.full_name,
     lead.company_domain,
     lead.company_name,
+    signal,
   );
   return { contact, searchCredits: PROVIDER_CREDITS.aleads.search };
 };
@@ -178,12 +185,13 @@ const findOne = async (
   lead: LeadIdentifier,
   emailTypes: ReadonlyArray<"work" | "personal">,
   upstreamHints?: FindEmailHints,
+  signal?: AbortSignal,
 ): Promise<{ result: PerUrlFinderResult; credits: number }> => {
   const fallbackUrl = lead.kind === "linkedin" ? lead.linkedin_url : "";
   const key = leadKey(lead);
 
   let credits = 0;
-  const { contact, searchCredits } = await searchForLead(lead);
+  const { contact, searchCredits } = await searchForLead(lead, signal);
   credits += searchCredits;
 
   if (!contact) {
@@ -196,8 +204,9 @@ const findOne = async (
   const hints = hintsForLead(lead, contact, upstreamHints);
   const emails: NormalizedEmail[] = [];
   for (const type of emailTypes) {
+    if (signal?.aborted) break; // caller stopped waiting — don't unlock more
     try {
-      const email = await unlockEmail(contact, hints, type);
+      const email = await unlockEmail(contact, hints, type, signal);
       credits += PROVIDER_CREDITS.aleads.find;
       if (email) {
         emails.push({
@@ -243,11 +252,17 @@ export const aleadsFinder: EmailFinder = {
     const out: PerUrlFinderResult[] = [];
     let credits = 0;
     for (const lead of input.leads) {
+      if (input.signal?.aborted) break; // caller stopped waiting
       // Hints keyed by URL only make sense for URL-mode leads. Name-mode
       // queries carry their own context on the LeadIdentifier itself.
       const hints =
         lead.kind === "linkedin" ? input.hints?.[lead.linkedin_url] : undefined;
-      const { result, credits: c } = await findOne(lead, input.email_types, hints);
+      const { result, credits: c } = await findOne(
+        lead,
+        input.email_types,
+        hints,
+        input.signal,
+      );
       credits += c;
       out.push(result);
     }

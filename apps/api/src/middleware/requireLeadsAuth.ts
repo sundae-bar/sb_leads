@@ -108,6 +108,23 @@ export function requireLeadsAuth(req: Request, res: Response, next: NextFunction
         return;
       }
 
+      // Defense-in-depth: re-check that the key's owner is still a member of
+      // the key's tenant. Without this, a key keeps authenticating after its
+      // owner has been removed from the tenant. Mirrors the JWT path above.
+      // We deliberately keep tenantRole pinned to 'member' regardless of the
+      // owner's actual role — API keys don't inherit owner/admin privileges.
+      const { data: membership } = await adminDb
+        .from('tenant_members')
+        .select('role')
+        .eq('user_id', row.user_id as string)
+        .eq('tenant_id', row.tenant_id as string)
+        .maybeSingle();
+
+      if (!membership) {
+        res.status(401).json({ error: 'API key owner is no longer a member of this tenant' });
+        return;
+      }
+
       // Fire-and-forget last_used_at update
       void adminDb
         .from('api_keys')

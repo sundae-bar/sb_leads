@@ -22,12 +22,17 @@ import { verifyEmailRouter } from './routes/verifyEmail.js';
 
 const app = express();
 
-// Trust Railway / Cloudflare's reverse proxy so req.protocol reads the real
-// scheme from X-Forwarded-Proto. Without this, the x402 middleware advertises
-// `resource.url: http://...` in the 402 payload (the internal scheme Railway
-// uses) instead of `https://...` — and the CDP Bazaar validator may reject
-// http resource URLs, leaving us silently uncatalogued.
-app.set('trust proxy', true);
+// Trust exactly TRUST_PROXY_HOPS reverse proxies (Railway edge = 1, default).
+// Two things depend on this:
+//   • req.protocol reads X-Forwarded-Proto from the trusted hop, so the x402
+//     middleware advertises `https://...` resource URLs (the CDP Bazaar
+//     validator may reject http URLs, leaving us silently uncatalogued).
+//   • req.ip — the rate-limit key. A hop COUNT makes Express read the entry
+//     our own edge appended to X-Forwarded-For. `trust proxy: true` would take
+//     the LEFT-most entry, which the client controls — letting an attacker
+//     rotate spoofed IPs past the limiter with a header per request.
+// If a Cloudflare-proxied custom domain fronts the API, set TRUST_PROXY_HOPS=2.
+app.set('trust proxy', config.trustProxyHops);
 
 // CORS: API and web are on different domains in prod (scoop-api-production.up.railway.app
 // vs scoop.sundaebar.ai), so we need an explicit allow-list. `WEB_URL` accepts a

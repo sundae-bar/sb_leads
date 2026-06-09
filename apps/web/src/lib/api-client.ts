@@ -1,6 +1,5 @@
 import { createClient } from './supabase/client';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { API_URL } from './constants';
 
 async function getToken(): Promise<string | null> {
   const supabase = createClient();

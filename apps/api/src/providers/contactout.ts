@@ -36,11 +36,12 @@ const headers = (): Record<string, string> => ({
 /** URL-mode lookup. */
 const fetchByUrl = async (
   url: string,
+  signal?: AbortSignal,
 ): Promise<ContactoutSingleProfile | undefined> => {
   const u = new URL(`${BASE}/people/linkedin`);
   u.searchParams.set("profile", url);
   u.searchParams.set("include_phone", "false");
-  const res = await request(u, { method: "GET", headers: headers() });
+  const res = await request(u, { method: "GET", headers: headers(), signal });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
     throw new ProviderError("contactout", `single ${res.statusCode}: ${text}`);
@@ -58,13 +59,14 @@ const fetchByName = async (
   firstName: string | undefined,
   lastName: string | undefined,
   domain: string | undefined,
+  signal?: AbortSignal,
 ): Promise<ContactoutSingleProfile | undefined> => {
   if (!firstName || !lastName || !domain) return undefined;
   const u = new URL(`${BASE}/email_finder`);
   u.searchParams.set("first_name", firstName);
   u.searchParams.set("last_name", lastName);
   u.searchParams.set("domain", domain);
-  const res = await request(u, { method: "GET", headers: headers() });
+  const res = await request(u, { method: "GET", headers: headers(), signal });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
     throw new ProviderError("contactout", `email_finder ${res.statusCode}: ${text}`);
@@ -81,13 +83,15 @@ const splitName = (full: string): { first?: string; last?: string } => {
 
 const fetchForLead = async (
   lead: LeadIdentifier,
+  signal?: AbortSignal,
 ): Promise<ContactoutSingleProfile | undefined> => {
-  if (lead.kind === "linkedin") return fetchByUrl(lead.linkedin_url);
+  if (lead.kind === "linkedin") return fetchByUrl(lead.linkedin_url, signal);
   const split = splitName(lead.full_name);
   return fetchByName(
     lead.first_name ?? split.first,
     lead.last_name ?? split.last,
     lead.company_domain,
+    signal,
   );
 };
 
@@ -145,8 +149,9 @@ export const contactoutFinder: EmailFinder = {
     const { leads, email_types } = input;
     const profiles = await Promise.all(
       leads.map(async (lead) => {
+        if (input.signal?.aborted) return undefined; // caller stopped waiting
         try {
-          return await fetchForLead(lead);
+          return await fetchForLead(lead, input.signal);
         } catch (err) {
           logger.warn({ err, lead }, "contactout fetch failed");
           return undefined;

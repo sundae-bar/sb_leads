@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Detect whether anything affecting the Supabase-backed tests changed, so the
+  # heavy integration job (boots a Docker Supabase stack, ~2.5 min) is skipped
+  # on docs-only / config-only PRs. The fast quality job always runs.
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'supabase/**'
+              - 'apps/**'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/ci.yml'
+
+  quality:
+    name: typecheck · build · unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # `pnpm install` runs the @scoop/types `prepare` script, which builds that
+      # package's dist/ — required before any consumer can typecheck, build, or
+      # run. This step is what would have caught the "Cannot find module
+      # '@scoop/types'" breakage on a fresh clone.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build API
+        run: pnpm --filter @scoop/api build
+
+      # DB-free subset (mocked Supabase). The Supabase-backed suites run in the
+      # `integration` job below.
+      - name: Unit tests
+        run: pnpm test:unit
+
+  integration:
+    name: integration (Supabase)
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Boots the local stack (Postgres + GoTrue + PostgREST + …) via Docker and
+      # applies supabase/migrations. The auth-backed RLS tests need GoTrue, so a
+      # bare Postgres service container won't do. Exclude the email (inbucket)
+      # and studio containers — unused by the tests, and their host ports
+      # (54333-54336) collide on the CI runner.
+      - name: Start Supabase
+        run: supabase start -x inbucket,studio
+
+      # Map the CLI's env output to the SUPABASE_* names the tests read, then
+      # run the Supabase-backed suites (RLS isolation + consume_credits atomicity).
+      - name: Run API integration tests
+        run: |
+          eval "$(supabase status -o env | sed 's/^/export /')"
+          export SUPABASE_URL="$API_URL" \
+                 SUPABASE_ANON_KEY="$ANON_KEY" \
+                 SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          pnpm --filter @scoop/api test:integration
+
+      # Stripe webhook test (credit top-up flow) — needs the same DB. It maps
+      # SUPABASE_URL → NEXT_PUBLIC_SUPABASE_URL and stubs the Stripe envs itself.
+      - name: Run web integration tests
+        run: |
+          eval "$(supabase status -o env | sed 's/^/export /')"
+          export SUPABASE_URL="$API_URL" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          pnpm --filter @scoop/web test:integration

@@ -60,6 +60,7 @@ Each provider is a single file in [apps/api/src/providers/](../apps/api/src/prov
 - **Rate limits.** Most providers have per-second or per-day caps. The waterfall doesn't currently throttle — a sudden spike in calls could trip a provider's limits and start failing. If this becomes an issue, add a per-provider rate limiter wrapper (the existing `apps/api/src/middleware/rateLimit.ts` LRU pattern is the obvious starting point).
 - **Verification.** Some providers return verified emails; some don't. The `normalized.verified` flag is set by the provider — be honest about whether your data source actually verifies or just guesses.
 - **Failure modes.** Providers go down. The waterfall logs every attempt to `providers_attempted`; check that yours surfaces a useful `error` string so debug is possible.
+- **Cancellation.** `FindEmailsInput` carries an optional `signal?: AbortSignal` — the paid x402 path aborts it when its deadline fires so a timed-out lookup stops spending. Pass it into every undici `request(url, { ..., signal })` call and check `input.signal?.aborted` between sequential calls (see `aleads.ts` for the pattern). The service layer stops the waterfall *between* providers regardless, but only your provider can cut off its own in-flight spend.
 
 ### Don't forget
 

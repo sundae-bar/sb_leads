@@ -102,6 +102,7 @@ const personToResult = (
  */
 const enrichBulk = async (
   leads: LeadIdentifier[],
+  signal?: AbortSignal,
 ): Promise<Array<NymeriaPerson | undefined>> => {
   const requests = leads.map((lead) => {
     if (lead.kind === "linkedin") {
@@ -125,6 +126,7 @@ const enrichBulk = async (
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ requests }),
+    signal,
   });
   if (res.statusCode >= 400) {
     const text = await res.body.text();
@@ -141,8 +143,13 @@ export const nymeriaFinder: EmailFinder = {
     const persons: Array<NymeriaPerson | undefined> = [];
     for (let i = 0; i < leads.length; i += BATCH_SIZE) {
       const chunk = leads.slice(i, i + BATCH_SIZE);
+      if (input.signal?.aborted) {
+        // caller stopped waiting — keep positional alignment, skip the spend
+        persons.push(...chunk.map(() => undefined));
+        continue;
+      }
       try {
-        const batch = await enrichBulk(chunk);
+        const batch = await enrichBulk(chunk, input.signal);
         persons.push(...batch);
       } catch (err) {
         logger.warn({ err }, "nymeria batch failed");

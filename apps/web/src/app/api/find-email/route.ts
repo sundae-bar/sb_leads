@@ -1,40 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthProvider } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-
-async function getToken() {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.refreshSession();
-  return session?.access_token;
-}
+import { callApi } from '@/lib/api-proxy';
 
 export async function POST(request: NextRequest) {
-  const user = await getAuthProvider().getCurrentUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  try {
-    const token = await getToken();
-    const body = await request.json();
-
-    const res = await fetch(`${API_URL}/find-email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(errBody.message ?? errBody.error ?? `Request failed: ${res.status}`);
-    }
-
-    return NextResponse.json(await res.json());
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Failed to find email';
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+  const body = await request.json().catch(() => ({}));
+  // find-email is the raw Express route (no /api/v1 prefix). refresh so the
+  // forwarded JWT carries the current active_tenant_id claim.
+  const r = await callApi('/find-email', {
+    method: 'POST',
+    body,
+    refresh: true,
+    errorMessage: 'Failed to find email',
+  });
+  if (!r.ok) return r.response;
+  return NextResponse.json(r.data);
 }
