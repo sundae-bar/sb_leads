@@ -147,12 +147,7 @@ async function performLookup(
     const partial = !emailTypes.every((t) => foundTypes.has(t));
     return {
       ok: true,
-      deliverable: buildDeliverable(
-        result,
-        body.linkedin_url ?? '',
-        requestId,
-        partial,
-      ),
+      deliverable: buildDeliverable(result, body.linkedin_url ?? '', partial),
     };
   } catch (err) {
     if (err instanceof HttpError && err.status === 504) {
@@ -215,6 +210,13 @@ x402FindEmailRouter.post('/x402/find-email', async (req, res) => {
   // (integrations/x402/settlement.ts) is the authoritative guard against the
   // second charge; here we avoid re-spending providers (deliverable cache +
   // in-flight lock) and report `charged` honestly.
+  //
+  // LOCKSTEP: the inputs extracted below (Idempotency-Key header, payer from
+  // the payment header, raw body, req.path) must match what
+  // keyFromSettleContext in settlement.ts extracts from the settle context.
+  // If either side changes, change both — otherwise deliverables cache under
+  // one key while settlements mark another, and the double-charge guard
+  // silently stops matching.
   const auth = parsePaymentAuth(
     req.header('x-payment') ?? req.header('payment-signature'),
   );

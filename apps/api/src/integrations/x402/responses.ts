@@ -17,6 +17,14 @@ export type X402ErrorCode =
   | 'provider_error'
   | 'internal_error';
 
+/**
+ * The cacheable deliverable payload. Billing metadata (`charged`, `duplicate`)
+ * and the per-response `requestId` are deliberately NOT part of this shape —
+ * the route composes them at send time, because one cached deliverable can be
+ * served by responses with different billing outcomes (fresh charge vs free
+ * duplicate). `charged` is best-effort under concurrency; the
+ * `X-PAYMENT-RESPONSE` header is the authoritative settlement record.
+ */
 export interface X402Deliverable {
   linkedin_url: string;
   emails: FindEmailResult['emails'];
@@ -25,16 +33,6 @@ export interface X402Deliverable {
   providers_attempted: FindEmailResult['providers_attempted'];
   /** True when some — but not all — requested email types were found. */
   partial: boolean;
-  /**
-   * Whether this response settled a payment. True for a fresh success; false
-   * when served from the idempotency cache as a duplicate (the buyer already
-   * paid for it). The `X-PAYMENT-RESPONSE` header is the authoritative record
-   * of on-chain settlement.
-   */
-  charged: boolean;
-  /** True when this is a cached replay of an already-paid request. */
-  duplicate?: boolean;
-  requestId: string;
 }
 
 export interface X402ErrorBody {
@@ -104,7 +102,6 @@ export function sendX402Error(
 export function buildDeliverable(
   result: FindEmailResult | undefined,
   fallbackLinkedinUrl: string,
-  requestId: string,
   partial: boolean,
 ): X402Deliverable {
   return {
@@ -114,7 +111,5 @@ export function buildDeliverable(
     company: result?.company ?? null,
     providers_attempted: result?.providers_attempted ?? [],
     partial,
-    charged: true,
-    requestId,
   };
 }

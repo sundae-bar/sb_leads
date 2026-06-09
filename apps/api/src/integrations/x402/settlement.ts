@@ -14,7 +14,14 @@ import type { BeforeSettleHook, OnSettleFailureHook, SettleContext } from '@x402
 import { logger } from '../../logger.js';
 import { deriveDedupeKey, idempotency } from './idempotency.js';
 
-/** Recompute the dedup key from a settlement context — mirrors the handler. */
+/**
+ * Recompute the dedup key from a settlement context.
+ *
+ * LOCKSTEP: this must extract the same inputs the route handler passes to
+ * deriveDedupeKey in routes/x402-find-email.ts (Idempotency-Key header, payer,
+ * raw body, route path). If either side changes, change both — a mismatch
+ * doesn't error, it just silently stops the double-charge guard from matching.
+ */
 function keyFromSettleContext(ctx: SettleContext): string | null {
   try {
     const payer = payerOf(ctx);
