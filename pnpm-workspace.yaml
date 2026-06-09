@@ -1,3 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+allowBuilds:
+  esbuild: true # native binary — tsx (api dev + scripts) and vitest
+  sharp: true # native libvips — Next.js image optimization
+  unrs-resolver: true # native napi resolver — eslint import resolution
+  '@coinbase/x402': false # postinstall only prints a CDP TOS notice
+  protobufjs: false # postinstall is a no-op version-scheme check
