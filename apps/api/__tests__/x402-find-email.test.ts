@@ -43,6 +43,43 @@ const workEmail: NormalizedEmail = {
   source_provider: 'apollo',
 };
 
+const verifiedWork: NormalizedEmail = {
+  address: 'jane@acme.com',
+  type: 'work',
+  verified: true,
+  source_provider: 'apollo',
+};
+
+const personalEmail: NormalizedEmail = {
+  address: 'jane@gmail.com',
+  type: 'personal',
+  verified: false,
+  source_provider: 'nymeria',
+};
+
+const verifiedPersonal: NormalizedEmail = {
+  address: 'jane@gmail.com',
+  type: 'personal',
+  verified: true,
+  source_provider: 'nymeria',
+};
+
+const workConfLow: NormalizedEmail = {
+  address: 'low@acme.com',
+  type: 'work',
+  verified: false,
+  source_provider: 'apollo',
+  confidence: 0.2,
+};
+
+const workConfHigh: NormalizedEmail = {
+  address: 'high@acme.com',
+  type: 'work',
+  verified: false,
+  source_provider: 'apollo',
+  confidence: 0.8,
+};
+
 function resultWith(emails: NormalizedEmail[]): FindEmailResult[] {
   return [
     {
@@ -72,6 +109,89 @@ describe('POST /x402/find-email — payment-safety contract', () => {
     expect(r.body.charged).toBe(true);
     expect(r.body.emails).toHaveLength(1);
     expect(r.body.requestId).toBeTruthy();
+    // Top-level summary surfaces the paid value so truncation can't hide it.
+    expect(r.body.summary).toMatchObject({
+      best_email: 'jane@acme.com',
+      type: 'work',
+      verified: false,
+      source: 'apollo',
+    });
+  });
+
+  it('summary picks the best email: verified work over an unverified personal', async () => {
+    mockFind.mockResolvedValue(resultWith([personalEmail, verifiedWork]));
+    const r = await request(makeApp()).post('/x402/find-email').send(URL_BODY);
+    expect(r.status).toBe(200);
+    expect(r.body.summary).toMatchObject({
+      best_email: 'jane@acme.com',
+      type: 'work',
+      verified: true,
+    });
+  });
+
+  it('partial:false on a defaulted request that returns a single type', async () => {
+    mockFind.mockResolvedValue(resultWith([workEmail]));
+    const r = await request(makeApp()).post('/x402/find-email').send(URL_BODY);
+    expect(r.status).toBe(200);
+    // No email_types specified → no expectation to violate → never partial.
+    expect(r.body.partial).toBe(false);
+  });
+
+  it('partial:true only when explicitly-requested types are not all found', async () => {
+    mockFind.mockResolvedValue(resultWith([workEmail]));
+    const r = await request(makeApp())
+      .post('/x402/find-email')
+      .send({ ...URL_BODY, email_types: ['work', 'personal'] });
+    expect(r.status).toBe(200);
+    expect(r.body.partial).toBe(true);
+  });
+
+  it('partial:false when the one explicitly-requested type is found', async () => {
+    mockFind.mockResolvedValue(resultWith([workEmail]));
+    const r = await request(makeApp())
+      .post('/x402/find-email')
+      .send({ ...URL_BODY, email_types: ['work'] });
+    expect(r.status).toBe(200);
+    expect(r.body.partial).toBe(false);
+  });
+
+  it('partial:true when only a personal email is found but both types were requested', async () => {
+    // Guards against a regression that checks "found something" instead of
+    // "found every requested type".
+    mockFind.mockResolvedValue(resultWith([personalEmail]));
+    const r = await request(makeApp())
+      .post('/x402/find-email')
+      .send({ ...URL_BODY, email_types: ['work', 'personal'] });
+    expect(r.status).toBe(200);
+    expect(r.body.partial).toBe(true);
+  });
+
+  it('partial is order-independent across explicitly-requested types', async () => {
+    mockFind.mockResolvedValue(resultWith([workEmail]));
+    const r = await request(makeApp())
+      .post('/x402/find-email')
+      .send({ ...URL_BODY, email_types: ['personal', 'work'] });
+    expect(r.status).toBe(200);
+    expect(r.body.partial).toBe(true); // personal missing, regardless of order
+  });
+
+  it('summary prefers a verified personal email over an unverified work email', async () => {
+    // Verified deliverability outranks email type.
+    mockFind.mockResolvedValue(resultWith([workEmail, verifiedPersonal]));
+    const r = await request(makeApp()).post('/x402/find-email').send(URL_BODY);
+    expect(r.status).toBe(200);
+    expect(r.body.summary).toMatchObject({
+      best_email: 'jane@gmail.com',
+      type: 'personal',
+      verified: true,
+    });
+  });
+
+  it('summary uses provider confidence to break ties within a tier', async () => {
+    mockFind.mockResolvedValue(resultWith([workConfLow, workConfHigh]));
+    const r = await request(makeApp()).post('/x402/find-email').send(URL_BODY);
+    expect(r.status).toBe(200);
+    expect(r.body.summary.best_email).toBe('high@acme.com');
   });
 
   it('404 + charged:false when zero emails are found (buyer not charged)', async () => {
@@ -81,6 +201,8 @@ describe('POST /x402/find-email — payment-safety contract', () => {
     expect(r.body.charged).toBe(false);
     expect(r.body.error.code).toBe('no_email_found');
     expect(r.body.providers_attempted).toBeDefined();
+    // A failure is not a deliverable — no summary leaks into the error body.
+    expect(r.body.summary).toBeUndefined();
   });
 
   it('504 + retryable when the lookup exceeds the deadline (buyer not charged)', async () => {
@@ -162,6 +284,25 @@ describe('POST /x402/find-email — idempotency (provider-spend + charge reporti
     expect(replay.body.charged).toBe(false);
     expect(replay.body.duplicate).toBe(true);
     expect(replay.body.emails).toHaveLength(1);
+    // The summary travels through the cache + duplicate path intact.
+    expect(replay.body.summary).toMatchObject({ best_email: 'jane@acme.com' });
+  });
+
+  it('cached but not-yet-settled replay reports charged:true, duplicate:false', async () => {
+    const app = makeApp();
+    const key = 'unsettled-replay';
+
+    const first = await request(app).post('/x402/find-email').set('Idempotency-Key', key).send(URL_BODY);
+    expect(first.status).toBe(200);
+
+    // No onBeforeSettle hook runs in this harness, so the key is never marked
+    // settled. A second request hits the cache (no re-spend) but is the one
+    // that WILL be charged — so it must report charged:true, not a free duplicate.
+    const second = await request(app).post('/x402/find-email').set('Idempotency-Key', key).send(URL_BODY);
+    expect(second.status).toBe(200);
+    expect(second.body.charged).toBe(true);
+    expect(second.body.duplicate).toBe(false);
+    expect(mockFind).toHaveBeenCalledTimes(1);
   });
 });
 
