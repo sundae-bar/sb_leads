@@ -223,6 +223,16 @@ export const x402Middleware = paymentMiddleware(
       description:
         'Find verified work and/or personal emails for a LinkedIn profile across multiple data providers (Aleads, Apollo, Nymeria, ContactOut). Optional Hunter.io verification. Returns in <5s.',
       mimeType: 'application/json',
+      // Service-level catalog metadata. These three fields ride along on the
+      // 402's `resource` (ResourceInfo) and are what Bazaar/agentic.market
+      // surface as the listing's name, tags, and icon — without them the
+      // listing falls back to the bare host (e.g. "api.scoop.sundaebar.ai").
+      // Constraints enforced by the resource server's ResourceInfoSchema:
+      // serviceName ≤32 printable-ASCII chars, ≤5 tags (each ≤32 ASCII),
+      // iconUrl ≤2048 chars. Keep the name lowercase per brand (scoop).
+      serviceName: 'scoop - LinkedIn email finder',
+      tags: ['email', 'linkedin', 'enrichment', 'lead-generation', 'b2b'],
+      iconUrl: 'https://scoop.sundaebar.ai/icon.png',
       // Only declare Bazaar discoverability on mainnet — Coinbase's crawler
       // ignores testnet endpoints, and we don't want noise in the dev catalog.
       extensions: DISCOVERABLE ? findEmailDiscovery : undefined,
