@@ -8,7 +8,7 @@
 //
 // What this script does:
 //   1. Loads a pre-funded buyer wallet from X402_BUYER_PRIVATE_KEY.
-//   2. POSTs to https://scoop-api-production.up.railway.app/x402/find-email
+//   2. POSTs to https://api.scoop.sundaebar.ai/x402/find-email
 //      (no payment header) → server returns HTTP 402 + payment requirements.
 //   3. `@x402/fetch` signs an EIP-3009 transferWithAuthorization for
 //      $0.25 USDC (Base mainnet) to our payTo wallet and retries.

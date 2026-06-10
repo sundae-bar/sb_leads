@@ -34,7 +34,7 @@ const app = express();
 // If a Cloudflare-proxied custom domain fronts the API, set TRUST_PROXY_HOPS=2.
 app.set('trust proxy', config.trustProxyHops);
 
-// CORS: API and web are on different domains in prod (scoop-api-production.up.railway.app
+// CORS: API and web are on different domains in prod (api.scoop.sundaebar.ai
 // vs scoop.sundaebar.ai), so we need an explicit allow-list. `WEB_URL` accepts a
 // comma-separated list so the same env var works for prod ("https://scoop.sundaebar.ai")
 // and local dev ("http://localhost:3002,http://localhost:3000"). Origins are matched
