@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
+import { FadeIn } from './fade-in';
 
 interface Props {
-  number: string;
+  number?: string;
   title: string;
   description?: string;
   children: React.ReactNode;
@@ -21,18 +22,22 @@ export function MarketingSection({
   className,
 }: Props) {
   return (
-    <section className={cn('w-full py-20', className)}>
-      <div className="mx-auto w-full max-w-6xl px-6">
-        <div className="mb-10 flex flex-col gap-3">
-          <span className="font-mono text-xs text-muted-foreground">{number}/</span>
-          <h2 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
-          {description && (
-            <p className="max-w-2xl text-base text-muted-foreground">{description}</p>
-          )}
-        </div>
-        {children}
+    <section className={cn('w-full py-[120px]', className)}>
+      <div className="mx-auto w-full max-w-[90rem] px-[80px]">
+        <FadeIn>
+          <div className="mb-10 flex flex-col gap-3">
+            {number && <span className="font-mono text-xs text-muted-foreground">{number}/</span>}
+            <h2 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
+              {title}
+            </h2>
+            {description && (
+              <p className="max-w-2xl text-base text-muted-foreground">{description}</p>
+            )}
+          </div>
+        </FadeIn>
+        <FadeIn delay={100}>
+          {children}
+        </FadeIn>
       </div>
     </section>
   );

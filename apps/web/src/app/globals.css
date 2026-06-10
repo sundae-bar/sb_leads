@@ -3,6 +3,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@utility font-ss {
+  font-feature-settings: "ss01", "ss03";
+}
+
 /* ─────────────────────────────────────────────────────────────────
    sundae_bar → scoop design tokens.
    Source of truth: Claude Design handoff bundle (`colors_and_type.css`).
