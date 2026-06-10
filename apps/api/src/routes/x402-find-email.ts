@@ -103,7 +103,10 @@ async function performLookup(
     : {
         linkedin_urls: [body.linkedin_url!],
       };
-  const emailTypes = (body.email_types ?? ['work', 'personal']) as EmailType[];
+  // `requestedTypes` is undefined when the caller didn't specify — we still
+  // search for both, but a defaulted request can't be "partial" (see below).
+  const requestedTypes = body.email_types as EmailType[] | undefined;
+  const emailTypes = requestedTypes ?? (['work', 'personal'] as EmailType[]);
 
   // Aborted when the deadline fires, so the orphaned findEmails run stops
   // spending on providers for a response nobody will receive: the waterfall
@@ -142,9 +145,15 @@ async function performLookup(
       };
     }
 
-    // Partial = at least one email, but not every requested type was found.
+    // `partial` is only meaningful when the caller EXPLICITLY asked for types:
+    // true when they did and we couldn't return all of them. A defaulted
+    // request has no expectation to violate (most lookups yield one type), so
+    // it's never flagged partial — otherwise the flag would fire on ~most
+    // successful calls and mean nothing.
     const foundTypes = new Set(emails.map((e) => e.type));
-    const partial = !emailTypes.every((t) => foundTypes.has(t));
+    const partial = requestedTypes
+      ? !requestedTypes.every((t) => foundTypes.has(t))
+      : false;
     return {
       ok: true,
       deliverable: buildDeliverable(result, body.linkedin_url ?? '', partial),

@@ -189,7 +189,18 @@ const findEmailDiscovery = declareDiscoveryExtension({
     },
   },
   output: {
+    // Mirrors the real 200 body so Bazaar buyers can stream-parse it. `summary`
+    // is the one-line digest; `charged`/`duplicate`/`requestId` are billing
+    // metadata, and the on-chain settlement tx rides in the X-PAYMENT-RESPONSE
+    // header (not the body). `partial` is true only when explicitly-requested
+    // email types weren't all found.
     example: {
+      summary: {
+        best_email: 'satya@microsoft.com',
+        type: 'work',
+        verified: true,
+        source: 'apollo',
+      },
       linkedin_url: 'https://linkedin.com/in/satyanadella',
       emails: [
         {
@@ -204,6 +215,10 @@ const findEmailDiscovery = declareDiscoveryExtension({
       providers_attempted: [
         { provider: 'apollo', found: true, error: null },
       ],
+      partial: false,
+      charged: true,
+      duplicate: false,
+      requestId: '9bcbf048-1f2c-4e3a-8d5b-0a1c2e3f4a5b',
     },
   },
 });
