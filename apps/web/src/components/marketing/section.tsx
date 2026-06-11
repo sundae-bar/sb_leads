@@ -22,8 +22,8 @@ export function MarketingSection({
   className,
 }: Props) {
   return (
-    <section className={cn('w-full py-[120px]', className)}>
-      <div className="mx-auto w-full max-w-[90rem] px-[80px]">
+    <section className={cn('w-full py-12 md:py-[120px]', className)}>
+      <div className="mx-auto w-full max-w-[90rem] px-5 md:px-[80px]">
         <FadeIn>
           <div className="mb-10 flex flex-col gap-3">
             {number && <span className="font-mono text-xs text-muted-foreground">{number}/</span>}

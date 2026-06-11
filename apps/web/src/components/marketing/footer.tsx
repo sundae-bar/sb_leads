@@ -25,18 +25,10 @@ function InstagramIcon() {
   );
 }
 
-function DiscordIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="size-5">
-      <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z" />
-    </svg>
-  );
-}
-
 export function MarketingFooter() {
   return (
     <footer className="border-t border-[#e9e9e9]">
-      <div className="mx-auto w-full max-w-[90rem] px-[80px] pt-[63px] pb-[40px]">
+      <div className="mx-auto w-full max-w-[90rem] px-5 pb-8 pt-10 md:px-[80px] md:pb-[40px] md:pt-[63px]">
         <div className="flex items-center justify-between">
           <Image
             src="/brand/scoop-logo_black_transparent 2.svg"
@@ -46,23 +38,20 @@ export function MarketingFooter() {
             unoptimized
           />
           <div className="flex items-center gap-[16px]">
-            <Link href="#" aria-label="LinkedIn" className="text-[#8c8c8c] transition hover:text-foreground">
+            <Link href="https://www.linkedin.com/company/sundae-bar" target="_blank" rel="noopener" aria-label="LinkedIn" className="text-[#8c8c8c] transition hover:text-foreground">
               <LinkedInIcon />
             </Link>
-            <Link href="#" aria-label="X" className="text-[#8c8c8c] transition hover:text-foreground">
+            <Link href="https://x.com/sundae_bar_" target="_blank" rel="noopener" aria-label="X" className="text-[#8c8c8c] transition hover:text-foreground">
               <XIcon />
             </Link>
-            <Link href="#" aria-label="Instagram" className="text-[#8c8c8c] transition hover:text-foreground">
+            <Link href="https://www.instagram.com/sundae_bar_ai" target="_blank" rel="noopener" aria-label="Instagram" className="text-[#8c8c8c] transition hover:text-foreground">
               <InstagramIcon />
-            </Link>
-            <Link href="#" aria-label="Discord" className="text-[#8c8c8c] transition hover:text-foreground">
-              <DiscordIcon />
             </Link>
           </div>
         </div>
 
-        <div className="mt-[40px] flex items-center justify-between">
-          <div className="font-ss flex items-center gap-[8px] text-[14px] font-medium leading-6 tracking-[-0.14px] text-[#8c8c8c]">
+        <div className="mt-8 flex flex-col gap-3 md:mt-[40px] md:flex-row md:items-center md:justify-between md:gap-0">
+          <div className="font-ss flex flex-wrap items-center gap-[8px] text-[14px] font-medium leading-6 tracking-[-0.14px] text-[#8c8c8c]">
             <span>Scoop © 2026 –</span>
             <div className="flex items-center gap-[8px]">
               <Link href="/privacy" className="transition hover:text-foreground">

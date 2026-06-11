@@ -17,14 +17,14 @@ const FADE_IN = { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
 export function HeroSection() {
   return (
-    <section className="relative mx-[40px] overflow-hidden rounded-[24px] border border-border">
+    <section className="relative mx-4 overflow-hidden rounded-[24px] border border-border md:mx-[40px]">
       {/* Corner marks */}
       <div className="absolute left-[23px] top-[23px] size-[8px] bg-border" />
       <div className="absolute right-[23px] top-[23px] size-[8px] bg-border" />
       <div className="absolute bottom-[23px] left-[23px] size-[8px] bg-border" />
       <div className="absolute bottom-[23px] right-[23px] size-[8px] bg-border" />
 
-      <div className="flex flex-col items-center pt-[111px]">
+      <div className="flex flex-col items-center pt-16 md:pt-[111px]">
         {/* Orange badge */}
         <motion.div
           {...FADE_IN}
@@ -38,7 +38,7 @@ export function HeroSection() {
         </motion.div>
 
         {/* Headline */}
-        <h1 className="font-ss mt-6 text-center text-[80px] font-medium leading-[80px] tracking-[-0.8px] text-foreground">
+        <h1 className="font-ss mt-6 px-4 text-center text-[40px] font-medium leading-[44px] tracking-[-0.4px] text-foreground md:px-0 md:text-[80px] md:leading-[80px] md:tracking-[-0.8px]">
           <span className="block overflow-hidden">
             <motion.span
               className="block"
@@ -67,7 +67,7 @@ export function HeroSection() {
         <motion.p
           {...FADE_IN}
           transition={FADE_TRANSITION}
-          className="font-ss mt-6 max-w-[726px] text-center text-[20px] font-normal leading-[32px] tracking-[-0.2px] text-[#8c8c8c]"
+          className="font-ss mt-6 max-w-[726px] px-6 text-center text-base leading-[28px] tracking-[-0.2px] text-[#8c8c8c] md:px-0 md:text-[20px] md:leading-[32px]"
         >
           Paste a LinkedIn URL. Scoop checks multiple providers to return verified emails. You only pay when it works.
         </motion.p>
@@ -76,7 +76,7 @@ export function HeroSection() {
         <motion.div
           {...FADE_IN}
           transition={FADE_TRANSITION}
-          className="mt-6 flex items-center gap-4"
+          className="mt-6 flex flex-wrap items-center justify-center gap-3"
         >
           <Link
             href="/signup"
@@ -99,13 +99,13 @@ export function HeroSection() {
         </div>
 
         {/* App screenshot */}
-        <div className="mx-[39px] mb-[48px] mt-[65px] w-[calc(100%-78px)] overflow-hidden rounded-[24px] shadow-[0px_0px_40px_0px_rgba(0,0,0,0.1)]">
+        <div className="mx-4 mb-8 mt-10 w-[calc(100%-32px)] overflow-hidden rounded-[16px] shadow-[0px_0px_40px_0px_rgba(0,0,0,0.1)] md:mx-[39px] md:mb-[48px] md:mt-[65px] md:w-[calc(100%-78px)] md:rounded-[24px]">
           <div className="relative aspect-video">
             <Image
               src="/Scoop - Demo.png"
               alt="scoop dashboard"
               fill
-              sizes="(max-width: 1440px) 100vw, 1440px"
+              sizes="(max-width: 768px) calc(100vw - 32px), (max-width: 1440px) calc(100vw - 80px), 1360px"
               className="object-cover object-top"
               unoptimized
             />

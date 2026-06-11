@@ -71,14 +71,13 @@ export function WorksEverywhereSection() {
     setRevealKeys(prev => prev.map((k, idx) => idx === i ? k + 1 : k));
   }, []);
 
-  // tab1Start / tab2Start are the scrollY values where each tab activates.
-  // Stored in a ref so the scroll handler closure always sees the latest values.
   const thresholdsRef = useRef<{ tab1: number; tab2: number } | null>(null);
 
   const computeThresholds = () => {
     const section = sectionRef.current;
     const card = cardRef.current;
     if (!section || !card) return;
+    if (window.innerWidth < 1024) return;
     const sectionY = section.getBoundingClientRect().top + window.scrollY;
     const cardOffset = card.offsetTop;
     const scrollable = section.offsetHeight - window.innerHeight - cardOffset;
@@ -96,6 +95,7 @@ export function WorksEverywhereSection() {
 
   useEffect(() => {
     const onScroll = () => {
+      if (window.innerWidth < 1024) return;
       const t = thresholdsRef.current;
       if (!t) return;
       const y = window.scrollY;
@@ -119,6 +119,7 @@ export function WorksEverywhereSection() {
   }, [activateTab]);
 
   const handleTabClick = (i: number) => {
+    if (window.innerWidth < 1024) { activateTab(i); return; }
     const section = sectionRef.current;
     const card = cardRef.current;
     if (!section || !card) { activateTab(i); return; }
@@ -132,32 +133,89 @@ export function WorksEverywhereSection() {
     });
   };
 
+  const tab = TABS[activeTab];
+
   return (
-    <section ref={sectionRef as React.RefObject<HTMLElement>} className="relative mt-[80px]" style={{ height: '450vh' }}>
+    <section ref={sectionRef as React.RefObject<HTMLElement>} className="relative mt-10 md:mt-[80px] lg:h-[450vh]">
       <div className="mx-auto h-full w-full max-w-[90rem]">
-      {/* Heading + subtitle — scroll normally, not sticky */}
-      <FadeIn className="px-[80px] pt-20">
-        <h2 className="font-ss text-[40px] font-medium leading-[48px] tracking-[-0.4px] text-foreground">
-          Works everywhere you do.
-        </h2>
-        <p className="font-ss mt-4 max-w-[740px] text-[20px] font-normal leading-[32px] tracking-[-0.2px] text-[#8c8c8c]">
-          Whether you&apos;re a human, a chat agent, or an autonomous worker on the402.ai
-          marketplace, you talk to the same backend.
-        </p>
-      </FadeIn>
 
-      {/* Card wrapper — sticky below the 80px header, height fills remaining viewport */}
-      <div ref={cardRef} className="sticky top-[80px] mx-[40px] mt-9 mb-[80px]">
-        <div
-          className="relative overflow-hidden rounded-[24px] border border-border bg-[#F9F9F9]"
-          style={{ height: 'calc(100vh - 160px)' }}
-        >
+        {/* Heading + subtitle */}
+        <FadeIn className="px-5 pt-12 md:px-[80px] md:pt-20">
+          <h2 className="font-ss text-[28px] font-medium leading-[34px] tracking-[-0.3px] text-foreground md:text-[40px] md:leading-[48px] md:tracking-[-0.4px]">
+            Works everywhere you do.
+          </h2>
+          <p className="font-ss mt-4 max-w-[740px] text-base font-normal leading-[28px] tracking-[-0.2px] text-[#8c8c8c] md:text-[20px] md:leading-[32px]">
+            Whether you&apos;re a human, a chat agent, or an autonomous worker on the402.ai
+            marketplace, you talk to the same backend.
+          </p>
+        </FadeIn>
 
-            {/* Tab row — top-[23px], left-[24px] right-[24px] */}
+        {/* ── MOBILE layout (below lg) ── */}
+        <div className="mt-6 px-5 lg:hidden">
+          {/* Tab buttons */}
+          <div className="flex gap-2">
+            {TABS.map((t, i) => (
+              <button
+                key={t.label}
+                onClick={() => handleTabClick(i)}
+                className={cn(
+                  'flex-1 rounded-[8px] px-3 py-2 text-sm font-medium font-ss transition-colors',
+                  i === activeTab
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border border-border text-foreground',
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Active tab content */}
+          <div className="mt-5 overflow-hidden rounded-[16px] border border-border bg-[#F9F9F9]">
+            {/* Image */}
+            {tab.image && (
+              <div className="relative aspect-video w-full overflow-hidden">
+                <Image
+                  src={tab.image}
+                  alt=""
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 0px"
+                  className="object-cover object-center"
+                  unoptimized
+                />
+              </div>
+            )}
+            {/* Text */}
+            <div className="p-5">
+              <p className="font-ss text-[24px] font-medium leading-[30px] tracking-[-0.24px] text-foreground">
+                {tab.heading.replace('\n', ' ')}
+              </p>
+              <div className="mt-4 flex flex-col gap-3">
+                {tab.bullets.map((bullet, j) => {
+                  const Icon = tab.icons[j];
+                  return (
+                    <div key={bullet} className="flex items-start gap-3">
+                      <Icon className="mt-0.5 size-[18px] shrink-0 text-primary" />
+                      <p className="font-ss text-base font-normal leading-[26px] tracking-[-0.2px] text-foreground">{bullet}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── DESKTOP layout (lg+) — sticky scroll-driven ── */}
+        <div ref={cardRef} className="hidden lg:sticky lg:top-[80px] lg:mx-[40px] lg:mb-[80px] lg:mt-9 lg:block">
+          <div
+            className="relative overflow-hidden rounded-[24px] border border-border bg-[#F9F9F9]"
+            style={{ height: 'calc(100vh - 160px)' }}
+          >
+            {/* Tab row */}
             <div className="absolute left-[24px] right-[24px] top-[23px] z-10 flex gap-[16px]">
-              {TABS.map((tab, i) => (
+              {TABS.map((t, i) => (
                 <button
-                  key={tab.label}
+                  key={t.label}
                   onClick={() => handleTabClick(i)}
                   className={cn(
                     'flex-1 rounded-[8px] px-[24px] py-[8px] text-base font-medium leading-[24px] tracking-[-0.16px] transition-colors font-ss',
@@ -166,28 +224,27 @@ export function WorksEverywhereSection() {
                       : 'border border-border text-foreground hover:bg-foreground/5',
                   )}
                 >
-                  {tab.label}
+                  {t.label}
                 </button>
               ))}
             </div>
 
-            {/* Tab panels — stacked, fade in/out */}
-            {TABS.map((tab, i) => (
+            {/* Tab panels */}
+            {TABS.map((t, i) => (
               <div
-                key={tab.label}
+                key={t.label}
                 aria-hidden={i !== activeTab}
                 className={cn(
                   'absolute inset-0 transition-opacity duration-500',
                   i === activeTab ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
               >
-                {/* Left content — absolute left-[39px] top-[143px] h-[536px] w-[584px] */}
                 <div className="absolute bottom-[80px] left-[39px] top-[143px] flex w-[584px] flex-col justify-between">
                   <p
                     key={revealKeys[i]}
                     className="font-ss text-[48px] font-medium leading-[52px] tracking-[-0.48px] text-foreground"
                   >
-                    {tab.heading.split('\n').map((line, li) => (
+                    {t.heading.split('\n').map((line, li) => (
                       <span key={li} className="block overflow-hidden">
                         <motion.span
                           className="block"
@@ -201,27 +258,25 @@ export function WorksEverywhereSection() {
                     ))}
                   </p>
                   <div className="flex flex-col gap-[12px]">
-                    {tab.bullets.map((bullet, j) => {
-                      const Icon = tab.icons[j];
+                    {t.bullets.map((bullet, j) => {
+                      const Icon = t.icons[j];
                       return (
-                      <div key={bullet} className="flex items-center gap-[16px]">
-                        <Icon className="size-[20px] shrink-0 text-primary" />
-                        <p className="font-ss text-[20px] font-normal leading-[32px] tracking-[-0.2px] text-foreground">
-                          {bullet}
-                        </p>
-                      </div>
+                        <div key={bullet} className="flex items-center gap-[16px]">
+                          <Icon className="size-[20px] shrink-0 text-primary" />
+                          <p className="font-ss text-[20px] font-normal leading-[32px] tracking-[-0.2px] text-foreground">{bullet}</p>
+                        </div>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Right image — absolute left-[687px] top-[103px] h-[576px] w-[632px] */}
                 <div className="absolute bottom-[40px] left-[687px] top-[103px] w-[632px] overflow-hidden rounded-[16px]">
-                  {tab.image ? (
+                  {t.image ? (
                     <Image
-                      src={tab.image}
+                      src={t.image}
                       alt=""
                       fill
+                      sizes="632px"
                       className="object-cover object-center"
                       unoptimized
                     />
@@ -231,9 +286,9 @@ export function WorksEverywhereSection() {
                 </div>
               </div>
             ))}
-
+          </div>
         </div>
-      </div>
+
       </div>
     </section>
   );
