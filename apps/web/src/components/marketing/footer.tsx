@@ -1,6 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { SCOOP_LOGO_SRC } from '@/lib/brand';
+
 function LinkedInIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className="size-5">
@@ -25,54 +27,63 @@ function InstagramIcon() {
   );
 }
 
+const SOCIAL_LINKS = [
+  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/sundae-bar', Icon: LinkedInIcon },
+  { label: 'X', href: 'https://x.com/sundae_bar_', Icon: XIcon },
+  { label: 'Instagram', href: 'https://www.instagram.com/sundae_bar_ai', Icon: InstagramIcon },
+] as const;
+
+const LEGAL_LINKS = [
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Terms', href: '/terms' },
+  { label: 'Cookies', href: '/cookies' },
+] as const;
+
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-[#e9e9e9]">
-      <div className="mx-auto w-full max-w-[90rem] px-5 pb-8 pt-10 md:px-[80px] md:pb-[40px] md:pt-[63px]">
+    <footer className="border-t border-border">
+      <div className="marketing-container pb-8 pt-10 md:pb-[40px] md:pt-[63px]">
         <div className="flex items-center justify-between">
-          <Image
-            src="/brand/scoop-logo_black_transparent 2.svg"
-            alt="scoop"
-            width={149}
-            height={56}
-            unoptimized
-          />
+          <Image src={SCOOP_LOGO_SRC} alt="scoop" width={149} height={56} />
           <div className="flex items-center gap-[16px]">
-            <Link href="https://www.linkedin.com/company/sundae-bar" target="_blank" rel="noopener" aria-label="LinkedIn" className="text-[#8c8c8c] transition hover:text-foreground">
-              <LinkedInIcon />
-            </Link>
-            <Link href="https://x.com/sundae_bar_" target="_blank" rel="noopener" aria-label="X" className="text-[#8c8c8c] transition hover:text-foreground">
-              <XIcon />
-            </Link>
-            <Link href="https://www.instagram.com/sundae_bar_ai" target="_blank" rel="noopener" aria-label="Instagram" className="text-[#8c8c8c] transition hover:text-foreground">
-              <InstagramIcon />
-            </Link>
+            {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+              <Link
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener"
+                aria-label={label}
+                className="text-marketing-text-muted transition hover:text-foreground rounded-[4px] focus-ring"
+              >
+                <Icon />
+              </Link>
+            ))}
           </div>
         </div>
 
         <div className="mt-8 flex flex-col gap-3 md:mt-[40px] md:flex-row md:items-center md:justify-between md:gap-0">
-          <div className="font-ss flex flex-wrap items-center gap-[8px] text-[14px] font-medium leading-6 tracking-[-0.14px] text-[#8c8c8c]">
+          <div className="font-ss flex flex-wrap items-center gap-[8px] text-[14px] font-medium leading-6 tracking-[-0.14px] text-marketing-text-muted">
             <span>Scoop © 2026 –</span>
             <div className="flex items-center gap-[8px]">
-              <Link href="/privacy" className="transition hover:text-foreground">
-                Privacy
-              </Link>
-              <Link href="/terms" className="transition hover:text-foreground">
-                Terms
-              </Link>
-              <Link href="/cookies" className="transition hover:text-foreground">
-                Cookies
-              </Link>
+              {LEGAL_LINKS.map(({ label, href }) => (
+                <Link
+                  key={label}
+                  href={href}
+                  className="transition hover:text-foreground rounded-[4px] focus-ring"
+                >
+                  {label}
+                </Link>
+              ))}
             </div>
           </div>
 
-          <div className="font-ss flex items-center gap-[8px] text-[14px] font-medium leading-6 tracking-[-0.14px]">
-            <span className="text-[#c4c4c4]">Trained using SN121</span>
+          <div className="font-ss flex items-center gap-[8px] text-[14px] font-medium leading-6 tracking-[-0.14px] text-marketing-text-muted">
+            <span>Trained using SN121</span>
             <Link
               href="https://sundaebar.ai"
               target="_blank"
               rel="noopener"
-              className="text-[#8c8c8c] transition hover:text-foreground"
+              className="transition hover:text-foreground rounded-[4px] focus-ring"
             >
               sundaebar.ai
             </Link>

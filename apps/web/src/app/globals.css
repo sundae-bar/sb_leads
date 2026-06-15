@@ -4,7 +4,46 @@
 @custom-variant dark (&:is(.dark *));
 
 @utility font-ss {
-  font-feature-settings: "ss01", "ss03";
+  font-feature-settings: 'ss01', 'ss03';
+}
+
+/* Shared marketing page gutter. */
+@utility marketing-container {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 90rem;
+  padding-inline: 1.25rem;
+  @media (width >= 768px) {
+    padding-inline: 5rem;
+  }
+}
+
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-ring) 50%, transparent);
+  }
+}
+
+/* Dark scoop-blob surface layers — used by <DarkBlobBackdrop> and the auth pages. */
+@utility dark-blob-vignette {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(26, 27, 38, 0.3) 0%,
+    rgba(26, 27, 38, 0.7) 60%,
+    rgba(26, 27, 38, 0.92) 100%
+  );
+}
+
+@utility grain {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0.1;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -18,8 +57,8 @@
 
 :root {
   /* shadcn-named tokens — values rebuilt to match the design system */
-  --background: oklch(100% 0 0);                /* #FFFFFF */
-  --foreground: oklch(22.63% 0.0214 280.5);     /* #1A1B26 warm-navy */
+  --background: oklch(100% 0 0); /* #FFFFFF */
+  --foreground: oklch(22.63% 0.0214 280.5); /* #1A1B26 warm-navy */
   --card: oklch(100% 0 0);
   --card-foreground: oklch(22.63% 0.0214 280.5);
   --popover: oklch(100% 0 0);
@@ -29,27 +68,27 @@
   --primary: oklch(58.42% 0.2356 273.5);
   --primary-foreground: oklch(100% 0 0);
 
-  --secondary: oklch(97.02% 0 0);               /* gray-200 */
+  --secondary: oklch(97.02% 0 0); /* gray-200 */
   --secondary-foreground: oklch(22.63% 0.0214 280.5);
 
-  --muted: oklch(98.21% 0 0);                   /* gray-100 */
-  --muted-foreground: oklch(64.01% 0 0);        /* slate-blue text-secondary ≈ #8084A7 */
+  --muted: oklch(98.21% 0 0); /* gray-100 */
+  --muted-foreground: oklch(64.01% 0 0); /* slate-blue text-secondary ≈ #8084A7 */
 
-  --accent: oklch(94.88% 0.0217 256.7);         /* blue-100 wash */
+  --accent: oklch(94.88% 0.0217 256.7); /* blue-100 wash */
   --accent-foreground: oklch(22.63% 0.0214 280.5);
 
-  --destructive: oklch(64% 0.22 25);            /* status red */
+  --destructive: oklch(64% 0.22 25); /* status red */
   --destructive-foreground: oklch(100% 0 0);
 
-  --border: oklch(93.4% 0 0);                   /* gray-300 #E9E9E9 */
+  --border: oklch(93.4% 0 0); /* gray-300 #E9E9E9 */
   --input: oklch(93.4% 0 0);
-  --ring: oklch(58.42% 0.2356 273.5);           /* same as primary */
+  --ring: oklch(58.42% 0.2356 273.5); /* same as primary */
 
-  --chart-1: oklch(58.42% 0.2356 273.5);        /* brand purple */
-  --chart-2: oklch(65.04% 0.1166 180.0);        /* brand green */
-  --chart-3: oklch(70.80% 0.1754 55.0);         /* brand orange */
-  --chart-4: oklch(63.30% 0.2273 351.0);        /* brand pink */
-  --chart-5: oklch(77.53% 0.1040 264.7);        /* secondary blue */
+  --chart-1: oklch(58.42% 0.2356 273.5); /* brand purple */
+  --chart-2: oklch(65.04% 0.1166 180); /* brand green */
+  --chart-3: oklch(70.8% 0.1754 55); /* brand orange */
+  --chart-4: oklch(63.3% 0.2273 351); /* brand pink */
+  --chart-5: oklch(77.53% 0.104 264.7); /* secondary blue */
 
   --radius: 0.625rem;
 
@@ -63,36 +102,43 @@
   --sidebar-ring: oklch(58.42% 0.2356 273.5);
 
   /* ─── Four flavour pairs — opt-in for marketing surfaces ─── */
-  --flavor-blue-bg:    #E5EFFD;
-  --flavor-blue-fg:    #615FFF;
-  --flavor-orange-bg:  #FFECE0;
-  --flavor-orange-fg:  #FEC5A2;
-  --flavor-green-bg:   #E6F6F4;
-  --flavor-green-fg:   #0AA692;
-  --flavor-pink-bg:    #FEF4FB;
-  --flavor-pink-fg:    #EF27A6;
+  --flavor-blue-bg: #e5effd;
+  --flavor-blue-fg: #615fff;
+  --flavor-orange-bg: #ffece0;
+  --flavor-orange-fg: #fec5a2;
+  --flavor-green-bg: #e6f6f4;
+  --flavor-green-fg: #0aa692;
+  --flavor-pink-bg: #fef4fb;
+  --flavor-pink-fg: #ef27a6;
+
+  /* ─── Marketing landing palette (text grays tuned for WCAG AA) ─── */
+  --marketing-text: #585858; /* strong secondary copy */
+  --marketing-text-muted: #6a6a6a; /* secondary copy — AA on white and the washes */
+  --marketing-decoration: #c4c4c4; /* decorative only (corner marks), never text */
+  --marketing-accent-text: #a84300; /* badge text/icon on the orange wash */
+  --surface-muted: #f9f9f9; /* off-white card / section wash */
 }
 
 .dark {
   --background: oklch(0.16 0.02 260);
   --foreground: oklch(0.95 0.005 250);
-  --card: oklch(0.20 0.02 260);
+  --card: oklch(0.2 0.02 260);
   --card-foreground: oklch(0.95 0.005 250);
-  --popover: oklch(0.20 0.02 260);
+  --popover: oklch(0.2 0.02 260);
   --popover-foreground: oklch(0.95 0.005 250);
-  --primary: oklch(0.60 0.14 250);
+  --primary: oklch(0.6 0.14 250);
   --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.25 0.02 260);
-  --secondary-foreground: oklch(0.90 0.005 250);
+  --secondary-foreground: oklch(0.9 0.005 250);
   --muted: oklch(0.25 0.02 260);
   --muted-foreground: oklch(0.65 0.02 260);
   --accent: oklch(0.28 0.02 260);
-  --accent-foreground: oklch(0.90 0.005 250);
+  --accent-foreground: oklch(0.9 0.005 250);
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.30 0.02 260);
-  --input: oklch(0.30 0.02 260);
-  --ring: oklch(0.60 0.14 250);
+  --border: oklch(0.3 0.02 260);
+  --input: oklch(0.3 0.02 260);
+  --ring: oklch(0.6 0.14 250);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -100,12 +146,12 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.18 0.02 260);
   --sidebar-foreground: oklch(0.95 0.005 250);
-  --sidebar-primary: oklch(0.60 0.14 250);
+  --sidebar-primary: oklch(0.6 0.14 250);
   --sidebar-primary-foreground: oklch(0.99 0 0);
   --sidebar-accent: oklch(0.25 0.02 260);
   --sidebar-accent-foreground: oklch(0.95 0.005 250);
-  --sidebar-border: oklch(0.30 0.02 260);
-  --sidebar-ring: oklch(0.60 0.14 250);
+  --sidebar-border: oklch(0.3 0.02 260);
+  --sidebar-ring: oklch(0.6 0.14 250);
 }
 
 @theme inline {
@@ -148,6 +194,17 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Marketing landing — expose the flavour washes + landing palette as
+     Tailwind colour utilities (bg-flavor-blue-bg, text-marketing-text-muted…) */
+  --color-flavor-blue-bg: var(--flavor-blue-bg);
+  --color-flavor-orange-bg: var(--flavor-orange-bg);
+  --color-flavor-orange-fg: var(--flavor-orange-fg);
+  --color-surface-muted: var(--surface-muted);
+  --color-marketing-text: var(--marketing-text);
+  --color-marketing-text-muted: var(--marketing-text-muted);
+  --color-marketing-decoration: var(--marketing-decoration);
+  --color-marketing-accent-text: var(--marketing-accent-text);
 }
 
 @layer base {
@@ -157,7 +214,7 @@
   body {
     @apply bg-background text-foreground;
   }
-  
+
   /* Override Radix UI ScrollArea wrapper div styles */
   [data-radix-scroll-area-viewport] > div {
     display: block !important;
@@ -165,9 +222,9 @@
     width: 100% !important;
     max-width: 100% !important;
   }
-  
+
   /* More specific override for inline styles */
-  div[style*="min-width: 100%"][style*="display: table"] {
+  div[style*='min-width: 100%'][style*='display: table'] {
     display: block !important;
     min-width: 0 !important;
     width: 100% !important;
