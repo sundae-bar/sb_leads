@@ -1,0 +1,53 @@
+# scoop (sb_leads) — frontend conventions for Cursor / AI assistants
+
+> The previous version of this file described a different project (a Sanity
+> `apps/studio`, Geist/JetBrains-only fonts, `(frontend)`/`(news)` route groups,
+> tabs-for-indentation). None of that matched this repo, so it was replaced.
+>
+> **Architecture, backend, tenancy, billing, and marketplace details live in
+> [CLAUDE.md](./CLAUDE.md) — read that first.** This file only covers
+> conventions for writing frontend code in `apps/web`.
+
+## Monorepo
+
+pnpm + Turborepo-style workspaces:
+
+- `apps/web` — Next.js 16 (App Router, React 19) frontend. Dev server on **:3004** (`next dev --port 3004`); see `apps/web/package.json`.
+- `apps/api` — Express 5 (ESM) backend on :4000.
+- `packages/types` — `@scoop/types`, shared snake_case→camelCase types.
+
+**Path alias:** `@/` → `apps/web/src/` (see `apps/web/tsconfig.json`).
+
+## File & naming conventions
+
+- **kebab-case** for all files and folders — `hero-section.tsx`, `use-conversations.ts`. Asset files too (no spaces, no `PascalCase`).
+- Exports use PascalCase (components) / camelCase (functions, hooks). A file's main export matches its name: `export function HeroSection()` in `hero-section.tsx`.
+- **2-space indentation** (not tabs).
+- Imports grouped: directive → react/next → external libs → `@/` internal → relative.
+
+## App Router layout (`apps/web/src/app`)
+
+Route groups: `(marketing)` (public landing), `(auth)` (login/signup/onboarding), `(dashboard)` (the product, gated), `api` (Next route handlers). The Next middleware is `apps/web/src/proxy.ts` (named `proxy.ts`, not `middleware.ts`).
+
+## Styling — Tailwind CSS v4 (CSS-first)
+
+- **No `tailwind.config`.** Tokens are defined in `apps/web/src/app/globals.css` — raw values in `:root`, exposed as utilities in `@theme inline`, and custom utilities via `@utility`.
+- **Prefer semantic tokens over raw hex.** Use `text-foreground`, `text-muted-foreground`, `bg-primary`, `border-border`, the flavour washes (`bg-flavor-blue-bg`, `bg-flavor-orange-bg`), and the marketing palette (`text-marketing-text`, `text-marketing-text-muted`, `text-marketing-accent-text`, `bg-surface-muted`). Add a token rather than hardcoding a new hex.
+- **Accessibility:** body/secondary text must clear WCAG AA (≥4.5:1). Note `--muted-foreground` is light — for marketing copy use the `marketing-*` text tokens, which are tuned for contrast.
+- Shared landing helpers: `marketing-container` utility (page gutter), `font-ss` utility (stylistic sets), and the `<SectionHeader>` / `<CornerMarks>` / `<DarkBlobBackdrop>` primitives in `components/marketing/`.
+- shadcn/ui base components live in `components/ui` — reuse them (they already ship focus-visible rings); hand-styled links/buttons should add the shared `focusRing` from `@/lib/focus-ring`.
+
+## Fonts
+
+Loaded in `apps/web/src/app/layout.tsx` via `next/font`: Geist Sans (`--font-sans`, default), Geist Mono (`--font-mono`), Plus Jakarta Sans (`--font-wordmark`, the scoop wordmark only).
+
+## React / Next.js
+
+- **Server Components by default.** Add `'use client'` only for state, effects, or `motion`. Keep the boundary small — prefer small client islands (e.g. `FadeIn`) inside server components.
+- **Animation:** `motion` (`motion/react`). The marketing tree is wrapped in `<MarketingMotionProvider>` (`MotionConfig reducedMotion="user"`) so animations respect `prefers-reduced-motion` — don't bypass it.
+- **`next/image`:** always pass accurate `sizes`; add `priority` to the LCP image; don't blanket-set `unoptimized` on local rasters (let the optimizer produce AVIF/WebP + srcset).
+- **Branch naming:** `prefix/kebab-case-description` (e.g. `ui/marketing-landing-redesign`).
+
+## Brand
+
+`scoop` is always lowercase (with a superscript `s_` in the wordmark) — never "Scoop" as a wordmark. Logo source: `@/lib/brand` (`SCOOP_LOGO_SRC`).
