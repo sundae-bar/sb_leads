@@ -10,6 +10,7 @@ import {
 } from '../db/queries/conversations.js';
 import { listMessages, createMessage } from '../db/queries/messages.js';
 import type { ModelMessage } from 'ai';
+import { logger } from '../logger.js';
 
 function generateTitleFromMessage(message: string): string {
   const cleaned = message.trim().replace(/\s+/g, ' ');
@@ -37,7 +38,7 @@ chatRouter.post(
       const supabase = req.supabase;
       const userId = req.user.id;
       const tenantId = req.user.tenantId;
-      console.log('[chat] stream request', { conversationId: providedConversationId, userId });
+      logger.debug({ conversationId: providedConversationId, userId, tenantId }, 'chat: stream request');
 
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -52,7 +53,7 @@ chatRouter.post(
       let conversationId = providedConversationId;
       let isNewConversation = false;
       if (!conversationId) {
-        console.log('[chat] creating new conversation');
+        logger.debug({ userId, tenantId }, 'chat: creating new conversation');
         const newConversation = await createConversation(supabase, userId, tenantId, 'New conversation');
         conversationId = newConversation.id;
         isNewConversation = true;
@@ -61,13 +62,13 @@ chatRouter.post(
 
       const conversation = await getConversation(supabase, conversationId!);
       if (!conversation) {
-        console.log('[chat] conversation not found', conversationId);
+        logger.warn({ conversationId }, 'chat: conversation not found');
         res.write(`data: ${JSON.stringify({ error: 'Conversation not found' })}\n\n`);
         res.write(`data: [DONE]\n\n`);
         res.end();
         return;
       }
-      console.log('[chat] conversation found, saving user message');
+      logger.debug({ conversationId }, 'chat: conversation found, saving user message');
 
       await createMessage(supabase, { conversationId: conversationId!, role: 'user', content: message });
 
@@ -77,12 +78,11 @@ chatRouter.post(
         content: m.content,
       }));
 
-      console.log('[chat] history length:', coreMessages.length);
-      console.log('[chat] calling runChatAgent');
+      logger.debug({ conversationId, historyLength: coreMessages.length }, 'chat: history loaded, calling agent');
 
       let clientDisconnected = false;
       req.on('close', () => {
-        console.log('[chat] client disconnected');
+        logger.debug({ conversationId }, 'chat: client disconnected');
         clientDisconnected = true;
       });
 
@@ -102,7 +102,7 @@ chatRouter.post(
                 }
               }
             } catch (writeErr) {
-              console.error('[chat] error writing chunk:', writeErr);
+              logger.error({ err: writeErr, conversationId }, 'chat: error writing chunk');
               clientDisconnected = true;
             }
           },
@@ -120,18 +120,18 @@ chatRouter.post(
                 }
               }
             } catch (writeErr) {
-              console.error('[chat] error writing tool result:', writeErr);
+              logger.error({ err: writeErr, conversationId }, 'chat: error writing tool result');
               clientDisconnected = true;
             }
           },
         });
 
         if (clientDisconnected) {
-          console.log('[chat] client disconnected before completion');
+          logger.debug({ conversationId }, 'chat: client disconnected before completion');
           return;
         }
 
-        console.log('[chat] agent done, tokens:', totalTokens);
+        logger.debug({ conversationId, totalTokens }, 'chat: agent done');
 
         await createMessage(supabase, {
           conversationId: conversationId!,
@@ -148,9 +148,9 @@ chatRouter.post(
           const title = generateTitleFromMessage(message);
           try {
             await updateConversation(supabase, conversationId!, title);
-            console.log('[chat] updated conversation title:', title);
+            logger.debug({ conversationId, title }, 'chat: updated conversation title');
           } catch (err) {
-            console.error('[chat] error updating conversation title:', err);
+            logger.error({ err, conversationId }, 'chat: error updating conversation title');
           }
         }
 
@@ -158,9 +158,9 @@ chatRouter.post(
           res.write(`data: [DONE]\n\n`);
           res.end();
         }
-        console.log('[chat] stream ended');
+        logger.debug({ conversationId }, 'chat: stream ended');
       } catch (agentErr) {
-        console.error('[chat] agent error:', agentErr);
+        logger.error({ err: agentErr, conversationId }, 'chat: agent error');
         if (!res.closed) {
           res.write(
             `data: ${JSON.stringify({
@@ -172,7 +172,7 @@ chatRouter.post(
         }
       }
     } catch (err) {
-      console.error('[chat] error:', err);
+      logger.error({ err }, 'chat: stream handler error');
       if (!res.closed) {
         res.write(
           `data: ${JSON.stringify({

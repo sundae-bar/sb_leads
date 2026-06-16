@@ -36,7 +36,7 @@ export function SettingsPassword() {
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
-    } catch (error) {
+    } catch {
       toast.error("Failed to update password")
     }
   }

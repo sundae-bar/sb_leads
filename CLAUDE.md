@@ -8,9 +8,8 @@ A pnpm monorepo: Next.js web + Express API + Supabase + Vercel AI SDK. Multi-ten
 
 | File | Purpose |
 |---|---|
-| [README.md](README.md) | Setup, dev commands, deploy. Authoritative for "how do I run this?" |
-| [agent-starter-plan.md](agent-starter-plan.md) | Full build spec / target architecture. May be ahead of current code — treat as intent, not state. |
-| [docs/README.md](docs/README.md) | Engineering docs index. Start here for marketplace integration questions. |
+| [README.md](README.md) | Engineering / marketplace docs index — points into `docs/`. **Holds no setup steps** (those are in the Dev workflow section below). |
+| [docs/environments.md](docs/environments.md) | Local / staging / production topology (Supabase branching), migration flow, per-environment secrets. |
 | [docs/the402.md](docs/the402.md) | the402.ai managed-marketplace path (webhook + USDC payouts, 5% fee). |
 | [docs/x402.md](docs/x402.md) | Raw x402 protocol endpoint at `/x402/find-email` (direct USDC on Base, listed on Coinbase Bazaar → agentic.market). |
 | [docs/extending.md](docs/extending.md) | Playbook for new input params, new providers, new services. |
@@ -19,10 +18,10 @@ A pnpm monorepo: Next.js web + Express API + Supabase + Vercel AI SDK. Multi-ten
 
 | Path | What | Stack |
 |---|---|---|
-| `apps/web` | Next.js frontend, dev port **3002**, prod 3000 | Next 16, React 19, shadcn/ui, Tailwind 4, TanStack Query 5 |
+| `apps/web` | Next.js frontend, dev port **3004**, prod 3000 | Next 16, React 19, shadcn/ui, Tailwind 4, TanStack Query 5 |
 | `apps/api` | Express backend, port **4000** | Express 5 (ESM), Vercel AI SDK, Trigger.dev v3, Pino, Zod |
-| `packages/types` | `@agent-starter/types` — `api.ts`, `db.ts`, `agent.ts`, `auth.ts`, barrel `index.ts` | DB rows mapped snake_case → camelCase before crossing the boundary |
-| `supabase/migrations` | 11 migrations (0001-0011) | RLS active, JWT-claim-based |
+| `packages/types` | `@scoop/types` — `api.ts`, `db.ts`, `agent.ts`, `auth.ts`, barrel `index.ts` | DB rows mapped snake_case → camelCase before crossing the boundary |
+| `supabase/migrations` | 16 migrations (0001-0016) | RLS active, JWT-claim-based |
 | `scripts/` | `create-user.ts`, `create-admin.ts`, `backfill-active-tenant.ts` | `pnpm <name>` from root |
 
 ## Two API surfaces (important)
@@ -111,7 +110,7 @@ Scoop runs on **five front doors** that all converge on `findEmails()` ([apps/ap
 | **the402 marketplace** | `POST /the402/webhook` | the402.ai buyers | HMAC signature from the402 | USDC on Base via the402 (5% fee) |
 | **x402 direct** | `POST /x402/find-email` | Any x402 client | Signed EIP-3009 payment proof | USDC on Base directly to our wallet |
 
-Both marketplace surfaces use the same `findEmails()` engine and the same deliverable JSON shape ([the402 services.ts](apps/api/src/integrations/the402/services.ts) declares both `input_schema` and `deliverable_schema`; the x402 endpoint mirrors them). Refund-on-empty works on the402 ([webhook.ts](apps/api/src/integrations/the402/webhook.ts)) and the internal paths but **not on x402** (`exact` scheme limitation — documented in [docs/x402.md](docs/x402.md)).
+Both marketplace surfaces use the same `findEmails()` engine and the same deliverable JSON shape ([the402 services.ts](apps/api/src/integrations/the402/services.ts) declares both `input_schema` and `deliverable_schema`; the x402 endpoint mirrors them). the402 + the internal paths **refund** on empty ([webhook.ts](apps/api/src/integrations/the402/webhook.ts)); x402 can't refund in-protocol (`exact` scheme) so instead it **doesn't charge** — empty/timeout/error return a `>= 400` status and the payment middleware cancels rather than settles (see the status→billing contract in [docs/x402.md](docs/x402.md)).
 
 - **For day-to-day questions** about either marketplace: read [docs/the402.md](docs/the402.md) and [docs/x402.md](docs/x402.md). They're 2-3 pages each and cover env vars, request/response shape, common operational moves.
 - **Adding a new input parameter** (e.g. let buyers pass `name + company` instead of just `linkedin_url`): see [docs/extending.md](docs/extending.md) §1.
@@ -124,13 +123,13 @@ Operational scripts live in [apps/api/scripts/](apps/api/scripts/):
 - `pnpm cdp:create-eoa` — one-shot to mint the receiving CDP wallet (already done; ID is in `X402_PAY_TO_ADDRESS`).
 - `pnpm discovery:poll` — watch for Scoop appearing in Coinbase Bazaar + agentic.market.
 
-## Dev workflow (compact — see README for full)
+## Dev workflow (compact)
 
 ```bash
 pnpm install
 supabase start && supabase migration up
 cp .env.example .env   # fill from `supabase status --output json`
-pnpm dev               # web :3002, api :4000, studio :54333
+pnpm dev               # web :3004, api :4000, studio :54333
 ```
 
 If migrating an existing local DB to RLS-active: `pnpm backfill-active-tenant` writes `app_metadata.active_tenant_id` for every existing `tenant_members` user.
@@ -141,20 +140,18 @@ Useful: `pnpm typecheck`, `pnpm lint`, `pnpm test` (cross-tenant isolation suite
 
 - **API is ESM** (`"type": "module"`). Relative imports must end in `.js` even from `.ts` files (e.g. `import { x } from './foo.js'`).
 - **API loads `.env` from repo root** via `tsx --env-file=../../.env`. Editing `apps/api/.env` won't do anything.
-- **Web dev port is 3002**, set in `apps/web/package.json`. The Express CORS origin defaults to `WEB_URL ?? 'http://localhost:3000'` — set `WEB_URL=http://localhost:3002` in `.env` for dev or CORS will reject preflight.
+- **Web dev port is 3004**, set in `apps/web/package.json`. The Express CORS origin defaults to `WEB_URL ?? 'http://localhost:3000'` — set `WEB_URL=http://localhost:3004` in `.env` for dev or CORS will reject preflight.
 - **`apps/web/src/proxy.ts` is the Next middleware** despite the name. Renaming or moving it will break auth.
 - **Tenant switching needs a session refresh.** Server-side `auth.admin.updateUserById(...)` updates `app_metadata`, but the client's JWT cookie is still stale. Always pair the API call with `supabase.auth.refreshSession()` on the client.
 - **JWT claim is the source of truth, but membership is the safety net.** A user removed from a tenant whose JWT still claims it gets a 403 from Express ("Active tenant is no longer valid") and is redirected to onboarding by the web.
 - **Trigger.dev is optional** — only runs when `TRIGGER_SECRET_KEY` is set.
-- **`apps/web/src_old/` is deprecated** — old code that pre-dates the multi-tenant refactor. Don't touch it.
 - **the402 service rename ≠ marketplace rename.** Renaming in [services.ts](apps/api/src/integrations/the402/services.ts) only changes our handler's lookup; the402's `svc_…` listing keeps the old name until you update it in their dashboard or `PATCH /v1/services/<id>`. Mismatch → `unknown_service` 500s.
 - **x402 facilitator auth differs by network.** Testnet (`x402.org/facilitator`) needs no auth — `HTTPFacilitatorClient({ url })` works. Mainnet (CDP) needs Ed25519 JWT headers — `HTTPFacilitatorClient(createFacilitatorConfig(id, secret))`. [server.ts](apps/api/src/integrations/x402/server.ts) picks the right one based on whether `CDP_API_KEY_ID` is set.
 - **CDP wallet address ≠ chain.** A single EVM EOA works on both Base mainnet *and* Base Sepolia — same `X402_PAY_TO_ADDRESS` across environments. Just funds aren't shared across chains.
 
 ## When in doubt
 
-- Architecture intent → [agent-starter-plan.md](agent-starter-plan.md).
-- Setup / commands → [README.md](README.md).
+- Setup / commands → the Dev workflow section above.
 - Shared types → [packages/types/src/index.ts](packages/types/src/index.ts) (barrel).
 - Auth flow on the web → [apps/web/src/proxy.ts](apps/web/src/proxy.ts), [apps/web/src/lib/auth/supabase.ts](apps/web/src/lib/auth/supabase.ts).
 - Auth flow on the API → [apps/api/src/middleware/auth.ts](apps/api/src/middleware/auth.ts).

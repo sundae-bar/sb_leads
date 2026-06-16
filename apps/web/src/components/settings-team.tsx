@@ -58,8 +58,8 @@ export function SettingsTeam() {
       await inviteUser.mutateAsync(inviteEmail)
       toast.success(`Invitation sent to ${inviteEmail}`)
       setInviteEmail("")
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send invitation")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to send invitation")
     }
   }
 
@@ -69,8 +69,8 @@ export function SettingsTeam() {
     try {
       await removeUser.mutateAsync(userId)
       toast.success("User removed successfully")
-    } catch (error: any) {
-      toast.error(error.message || "Failed to remove user")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to remove user")
     }
   }
 

@@ -11,6 +11,7 @@ import { createFacilitatorConfig } from '@coinbase/x402';
 import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
 import type { Network } from '@x402/core/types';
 import { logger } from '../../logger.js';
+import { dedupeBeforeSettle, dedupeOnSettleFailure } from './settlement.js';
 
 // Patch the global fetch with a sniffer for requests to the CDP facilitator,
 // so we can see EXTENSION-RESPONSES (Bazaar's per-extension accept/reject
@@ -71,12 +72,13 @@ import { logger } from '../../logger.js';
   };
 }
 
-// NOTE on refund-on-empty: `exact` is all-or-nothing — facilitator rejects
-// partial settlement, so we can't refund the buyer in-protocol when
-// findEmails returns no hits. The `upto` scheme supports it but requires
-// Permit2 approvals on the buyer side, which most x402 clients don't
-// implement. We accept "no refund on x402" as a deliberate tradeoff; the
-// dashboard + the402 paths still refund. Revisit if buyers ask.
+// NOTE on payment safety: `exact` is all-or-nothing — the facilitator rejects
+// partial settlement, so there is no in-protocol refund when findEmails returns
+// no hits. Rather than charge-and-keep on a miss, the handler returns a >=400
+// status whenever it has no deliverable (no emails, timeout, error), and this
+// middleware CANCELS the authorization instead of settling it — so the buyer is
+// never charged for a failed or empty lookup. Only a 2xx (>=1 email) settles.
+// See routes/x402-find-email.ts for the full status→billing contract.
 
 const FACILITATOR_URL =
   process.env.X402_FACILITATOR_URL ?? 'https://x402.org/facilitator';
@@ -116,10 +118,14 @@ const facilitatorConfig =
 
 const facilitator = new HTTPFacilitatorClient(facilitatorConfig);
 
-const server = new x402ResourceServer(facilitator).register(
-  NETWORK,
-  new ExactEvmScheme(),
-);
+// `onBeforeSettle` is the authoritative double-charge guard: it skips
+// settlement for a payer's repeat of a request we already charged (and
+// `onSettleFailure` un-marks a key whose real settlement failed). See
+// integrations/x402/settlement.ts.
+const server = new x402ResourceServer(facilitator)
+  .register(NETWORK, new ExactEvmScheme())
+  .onBeforeSettle(dedupeBeforeSettle)
+  .onSettleFailure(dedupeOnSettleFailure);
 
 // Bazaar discovery extension.
 //
@@ -183,7 +189,18 @@ const findEmailDiscovery = declareDiscoveryExtension({
     },
   },
   output: {
+    // Mirrors the real 200 body so Bazaar buyers can stream-parse it. `summary`
+    // is the one-line digest; `charged`/`duplicate`/`requestId` are billing
+    // metadata, and the on-chain settlement tx rides in the X-PAYMENT-RESPONSE
+    // header (not the body). `partial` is true only when explicitly-requested
+    // email types weren't all found.
     example: {
+      summary: {
+        best_email: 'satya@microsoft.com',
+        type: 'work',
+        verified: true,
+        source: 'apollo',
+      },
       linkedin_url: 'https://linkedin.com/in/satyanadella',
       emails: [
         {
@@ -198,6 +215,10 @@ const findEmailDiscovery = declareDiscoveryExtension({
       providers_attempted: [
         { provider: 'apollo', found: true, error: null },
       ],
+      partial: false,
+      charged: true,
+      duplicate: false,
+      requestId: '9bcbf048-1f2c-4e3a-8d5b-0a1c2e3f4a5b',
     },
   },
 });
@@ -217,6 +238,16 @@ export const x402Middleware = paymentMiddleware(
       description:
         'Find verified work and/or personal emails for a LinkedIn profile across multiple data providers (Aleads, Apollo, Nymeria, ContactOut). Optional Hunter.io verification. Returns in <5s.',
       mimeType: 'application/json',
+      // Service-level catalog metadata. These three fields ride along on the
+      // 402's `resource` (ResourceInfo) and are what Bazaar/agentic.market
+      // surface as the listing's name, tags, and icon — without them the
+      // listing falls back to the bare host (e.g. "api.scoop.sundaebar.ai").
+      // Constraints enforced by the resource server's ResourceInfoSchema:
+      // serviceName ≤32 printable-ASCII chars, ≤5 tags (each ≤32 ASCII),
+      // iconUrl ≤2048 chars. Keep the name lowercase per brand (scoop).
+      serviceName: 'scoop - LinkedIn email finder',
+      tags: ['email', 'linkedin', 'enrichment', 'lead-generation', 'b2b'],
+      iconUrl: 'https://scoop.sundaebar.ai/icon.png',
       // Only declare Bazaar discoverability on mainnet — Coinbase's crawler
       // ignores testnet endpoints, and we don't want noise in the dev catalog.
       extensions: DISCOVERABLE ? findEmailDiscovery : undefined,

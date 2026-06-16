@@ -41,6 +41,14 @@ export interface FindEmailOptions {
   hints?: HintsByUrl;
   request_id?: string;
   tenant_id?: string;
+  /**
+   * Cooperative cancellation. When the caller stops waiting (e.g. the paid
+   * x402 path's deadline fires and the buyer was told "not charged"), aborting
+   * stops the waterfall before the next provider round, skips verification,
+   * and cancels in-flight provider HTTP calls — no more upstream spend on a
+   * response nobody will receive. Optional; omitted = unchanged behavior.
+   */
+  signal?: AbortSignal;
 }
 
 const hasRequestedTypes = (
@@ -98,6 +106,7 @@ const resolveProviderChain = (
 const verifyEmails = async (
   emails: NormalizedEmail[],
   requestId: string | undefined,
+  signal?: AbortSignal,
 ): Promise<{ emails: NormalizedEmail[]; credits: number }> => {
   const verifier = verifiers[DEFAULT_VERIFIER];
   if (!verifier || !isProviderConfigured(DEFAULT_VERIFIER)) {
@@ -110,8 +119,12 @@ const verifyEmails = async (
       out.push(e);
       continue;
     }
+    if (signal?.aborted) {
+      out.push(e); // caller stopped waiting — keep the email, skip the spend
+      continue;
+    }
     try {
-      const v = await verifier.verifyEmail(e.address);
+      const v = await verifier.verifyEmail(e.address, signal);
       credits += v.credits_used;
       logCredit({
         provider: DEFAULT_VERIFIER,
@@ -186,6 +199,7 @@ export const findEmails = async (
   );
 
   for (const providerName of chain) {
+    if (opts.signal?.aborted) break; // caller stopped waiting — no further spend
     const provider = finders[providerName]!;
     // Decide which leads still need work this round. In waterfall mode, skip
     // any lead that already has every requested email type.
@@ -204,6 +218,7 @@ export const findEmails = async (
         leads: remainingLeads,
         email_types: opts.email_types,
         hints: opts.hints,
+        signal: opts.signal,
       });
     } catch (err) {
       logger.warn({ err, provider: providerName }, "provider failed");
@@ -269,9 +284,13 @@ export const findEmails = async (
     r.credits_used = Math.round(r.credits_used);
   }
 
-  if (opts.verify) {
+  if (opts.verify && !opts.signal?.aborted) {
     for (const r of initial.values()) {
-      const { emails, credits } = await verifyEmails(r.emails, opts.request_id);
+      const { emails, credits } = await verifyEmails(
+        r.emails,
+        opts.request_id,
+        opts.signal,
+      );
       r.emails = emails;
       r.credits_used += credits;
     }

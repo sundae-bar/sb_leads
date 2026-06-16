@@ -23,6 +23,13 @@ export interface FindEmailsInput {
   leads: LeadIdentifier[];
   email_types: EmailType[];
   hints?: HintsByUrl;
+  /**
+   * Cooperative cancellation. Set when the caller has stopped waiting (e.g.
+   * the paid x402 path timing out — the buyer was already told "not charged",
+   * so any further upstream spend is pure waste). Providers pass it into
+   * their HTTP requests and check it between sequential calls.
+   */
+  signal?: AbortSignal;
 }
 
 export interface PerUrlFinderResult {
@@ -71,7 +78,7 @@ export interface VerifyOutput {
 
 export interface EmailVerifier {
   name: ProviderName;
-  verifyEmail(email: string): Promise<VerifyOutput>;
+  verifyEmail(email: string, signal?: AbortSignal): Promise<VerifyOutput>;
 }
 
 export interface IntentInput {

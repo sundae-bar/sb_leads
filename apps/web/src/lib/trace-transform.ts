@@ -157,12 +157,11 @@ export function transformAgentRunToTrace(
     startedAt: agentRun.startedAt,
     steps: steps.map(transformStep),
     totalSteps: steps.length,
+    // Aliases some UI surfaces read.
+    inputTokens: tokenBreakdown.promptTokens,
+    outputTokens: tokenBreakdown.completionTokens,
+    timestamp: new Date(agentRun.startedAt),
   };
-
-  // Add aliases for UI compatibility (inputTokens/outputTokens)
-  (trace as any).inputTokens = tokenBreakdown.promptTokens;
-  (trace as any).outputTokens = tokenBreakdown.completionTokens;
-  (trace as any).timestamp = new Date(agentRun.startedAt);
 
   return trace;
 }

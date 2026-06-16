@@ -1,29 +1,26 @@
 // API-side credit operations — used by the chat route + provider tools to
 // gate paid work, and by the webhook handler to credit incoming payments.
 // Backed by the credit_ledger / tenant_credits tables introduced in 0016.
-// Mirrors apps/web/src/lib/billing/index.ts (kept thin to avoid cross-imports).
+//
+// The credit *contracts* (consume_credits RPC args, refund row shape, ledger
+// mapping, option/result types) live in @scoop/types so this module and its
+// apps/web counterpart can't drift on the parts that move money. What stays
+// here is the thin wrapper that binds those contracts to the admin client.
 import { adminDb } from '../db/admin.js';
-import type {
-  CreditEntryKind,
-  CreditLedgerEntry,
-  RedeemCouponResult,
-  TenantCreditsResponse,
+import {
+  consumeCreditsArgs,
+  refundLedgerRow,
+  toCreditLedgerEntry,
+  type ConsumeCreditsOptions,
+  type ConsumeCreditsResult,
+  type CreditLedgerRow,
+  type PlanId,
+  type RedeemCouponResult,
+  type TenantCreditsResponse,
 } from '@scoop/types';
 
-interface ConsumeOptions {
-  /** One of credit_entry_kind PG enum. Defaults to `debit_find`. */
-  kind?: CreditEntryKind;
-  /** Free-form human description ("find_email Cykel"). */
-  description?: string;
-  /** Categorical ref (e.g. 'find_email_request', 'verify_email'). */
-  refType?: string;
-  /** ID under refType (e.g. the request UUID). */
-  refId?: string;
-}
-
-export type ConsumeResult =
-  | { ok: true; remaining: number }
-  | { ok: false; reason: 'out_of_credits' };
+export type ConsumeOptions = ConsumeCreditsOptions;
+export type ConsumeResult = ConsumeCreditsResult;
 
 /**
  * Atomically debit `amount` credits from `tenantId`. Inserts a debit row in
@@ -31,21 +28,13 @@ export type ConsumeResult =
  * the same row lock the RPC holds, so concurrent debits cannot oversell.
  *
  * Returns `{ ok: false, reason: 'out_of_credits' }` when balance < amount.
- * The old auto-rebill path is gone — top-ups are now explicit user actions.
  */
 export async function consumeCredits(
   tenantId: string,
   amount: number,
-  opts: ConsumeOptions = {},
-): Promise<ConsumeResult> {
-  const { data: ok } = await adminDb.rpc('consume_credits', {
-    p_tenant_id: tenantId,
-    p_amount: amount,
-    p_kind: opts.kind ?? 'debit_find',
-    p_description: opts.description ?? null,
-    p_ref_type: opts.refType ?? null,
-    p_ref_id: opts.refId ?? null,
-  });
+  opts: ConsumeCreditsOptions = {},
+): Promise<ConsumeCreditsResult> {
+  const { data: ok } = await adminDb.rpc('consume_credits', consumeCreditsArgs(tenantId, amount, opts));
   if (ok !== true) return { ok: false, reason: 'out_of_credits' };
   const remaining = await getCreditsRemaining(tenantId);
   return { ok: true, remaining };
@@ -59,16 +48,9 @@ export async function consumeCredits(
 export async function refundCredits(
   tenantId: string,
   amount: number,
-  opts: { description?: string; refType?: string; refId?: string } = {},
+  opts: Pick<ConsumeCreditsOptions, 'description' | 'refType' | 'refId'> = {},
 ): Promise<{ remaining: number }> {
-  await adminDb.from('credit_ledger').insert({
-    tenant_id: tenantId,
-    amount,
-    kind: 'refund',
-    description: opts.description ?? null,
-    ref_type: opts.refType ?? null,
-    ref_id: opts.refId ?? null,
-  });
+  await adminDb.from('credit_ledger').insert(refundLedgerRow(tenantId, amount, opts));
   const remaining = await getCreditsRemaining(tenantId);
   return { remaining };
 }
@@ -81,34 +63,6 @@ export async function getCreditsRemaining(tenantId: string): Promise<number> {
     .eq('tenant_id', tenantId)
     .maybeSingle();
   return (data?.balance as number | undefined) ?? 0;
-}
-
-interface LedgerRow {
-  id: number;
-  tenant_id: string;
-  amount: number;
-  kind: CreditEntryKind;
-  description: string | null;
-  ref_type: string | null;
-  ref_id: string | null;
-  actor_id: string | null;
-  metadata: unknown;
-  created_at: string;
-}
-
-function toLedgerEntry(row: LedgerRow): CreditLedgerEntry {
-  return {
-    id: row.id,
-    tenantId: row.tenant_id,
-    amount: row.amount,
-    kind: row.kind,
-    description: row.description,
-    refType: row.ref_type,
-    refId: row.ref_id,
-    actorId: row.actor_id,
-    metadata: row.metadata,
-    createdAt: row.created_at,
-  };
 }
 
 /**
@@ -129,7 +83,7 @@ export async function getTenantCredits(
       .order('created_at', { ascending: false })
       .limit(limit),
   ]);
-  const recent = ((rows ?? []) as LedgerRow[]).map(toLedgerEntry);
+  const recent = ((rows ?? []) as CreditLedgerRow[]).map(toCreditLedgerEntry);
 
   // If the tenant has a legacy subscriptions row, surface a slimmed-down
   // view of it so the UI can show "you're on the Growth plan, expires X".
@@ -140,11 +94,7 @@ export async function getTenantCredits(
     .maybeSingle();
   const legacyPlan = sub
     ? {
-        planId: sub.plan_id as TenantCreditsResponse['legacyPlan'] extends infer L
-          ? L extends { planId: infer P }
-            ? P
-            : never
-          : never,
+        planId: sub.plan_id as PlanId,
         status: sub.status as string,
         cycleEndsAt: (sub.cycle_ends_at as string | null) ?? null,
       }

@@ -9,6 +9,7 @@ import {
   type TopupPresetUsd,
   usdToCredits,
 } from '@scoop/types';
+import { WEB_URL } from '@/lib/constants';
 
 /**
  * One-time Stripe Checkout for buying a credit pack. Distinct from the
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   const credits = usdToCredits(amountUsd);
   const customerId = await ensureStripeCustomer(user.tenantId, user.email);
-  const webUrl = process.env.WEB_URL ?? 'http://localhost:3002';
+  const webUrl = WEB_URL;
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',

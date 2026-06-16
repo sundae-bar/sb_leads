@@ -3,6 +3,7 @@ import { getAuthProvider } from '@/lib/auth';
 import { stripe } from '@/lib/billing/stripe';
 import { ensureStripeCustomer } from '@/lib/billing';
 import { PLANS, type PlanId } from '@scoop/types';
+import { WEB_URL } from '@/lib/constants';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthProvider().getCurrentUser();
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   const customerId = await ensureStripeCustomer(user.tenantId, user.email);
-  const webUrl = process.env.WEB_URL ?? 'http://localhost:3002';
+  const webUrl = WEB_URL;
 
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',

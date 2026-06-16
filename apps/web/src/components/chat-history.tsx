@@ -84,8 +84,8 @@ export function ChatHistory({
             router.refresh()
           }
           toast.success("Conversation deleted")
-        } catch (error: any) {
-          toast.error(error.message || "Failed to delete conversation")
+        } catch (error: unknown) {
+          toast.error(error instanceof Error ? error.message : "Failed to delete conversation")
           throw error // Re-throw so the modal stays open if there's an error
         }
       },
@@ -94,8 +94,8 @@ export function ChatHistory({
 
   // Sort conversations by updated_at descending (latest first)
   const sortedConversations = [...(conversations ?? [])].sort((a, b) => {
-    const aTime = new Date((a as any).updated_at || (a as any).created_at).getTime()
-    const bTime = new Date((b as any).updated_at || (b as any).created_at).getTime()
+    const aTime = new Date(a.updatedAt ?? a.createdAt).getTime()
+    const bTime = new Date(b.updatedAt ?? b.createdAt).getTime()
     return bTime - aTime
   })
 
@@ -107,7 +107,7 @@ export function ChatHistory({
   // Group conversations by date
   const grouped = filteredConversations.reduce(
     (acc, conv) => {
-      const dateLabel = formatDate((conv as any).updated_at || (conv as any).created_at)
+      const dateLabel = formatDate(conv.updatedAt ?? conv.createdAt)
       if (!acc[dateLabel]) acc[dateLabel] = []
       acc[dateLabel].push(conv)
       return acc

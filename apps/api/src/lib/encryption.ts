@@ -15,7 +15,7 @@ function getEncryptionKey(): Buffer {
   // Decode base64 key
   try {
     return Buffer.from(key, 'base64');
-  } catch (error) {
+  } catch {
     throw new Error('API_KEY_ENCRYPTION_KEY must be a valid base64-encoded 32-byte key');
   }
 }

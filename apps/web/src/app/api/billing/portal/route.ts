@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthProvider } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { stripe } from '@/lib/billing/stripe';
+import { WEB_URL } from '@/lib/constants';
 
 export async function POST() {
   const user = await getAuthProvider().getCurrentUser();
@@ -20,7 +21,7 @@ export async function POST() {
     return NextResponse.json({ error: 'No active subscription' }, { status: 400 });
   }
 
-  const webUrl = process.env.WEB_URL ?? 'http://localhost:3002';
+  const webUrl = WEB_URL;
   const session = await stripe.billingPortal.sessions.create({
     customer: sub.stripe_customer_id,
     return_url: `${webUrl}/settings/billing`,
