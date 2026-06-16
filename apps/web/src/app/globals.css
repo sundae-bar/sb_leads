@@ -1,7 +1,8 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
+/* `dark:` applies under .dark, except inside a `.force-light` subtree (the marketing pages). */
+@custom-variant dark (&:is(.dark *):not(:is(.force-light *)));
 
 @utility font-ss {
   font-feature-settings: 'ss01', 'ss03';
@@ -55,7 +56,8 @@
    the shadcn variables so marketing components can opt into them.
    ───────────────────────────────────────────────────────────────── */
 
-:root {
+:root,
+.force-light {
   /* shadcn-named tokens — values rebuilt to match the design system */
   --background: oklch(100% 0 0); /* #FFFFFF */
   --foreground: oklch(22.63% 0.0214 280.5); /* #1A1B26 warm-navy */
@@ -117,6 +119,11 @@
   --marketing-decoration: #c4c4c4; /* decorative only (corner marks), never text */
   --marketing-accent-text: #a84300; /* badge text/icon on the orange wash */
   --surface-muted: #f9f9f9; /* off-white card / section wash */
+}
+
+/* Marketing pages opt out of dark mode entirely (light tokens above + light UA controls). */
+.force-light {
+  color-scheme: light;
 }
 
 .dark {
